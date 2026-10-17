@@ -1,0 +1,100 @@
+using SkiaSharp;
+
+namespace Matrix.Core;
+
+public sealed record Grid(int Columns, int Rows)
+{
+    public void Validate()
+    {
+        if (Columns is < 1 or > 100 || Rows is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(Columns), "Raster: jeweils 1 bis 100 Felder.");
+    }
+    public string Coordinate(int column, int row)
+    {
+        Validate();
+        if (column < 0 || column >= Columns || row < 0 || row >= Rows)
+            throw new ArgumentOutOfRangeException(nameof(column));
+        var letters = "";
+        for (var n = column + 1; n > 0; n = (n - 1) / 26)
+            letters = (char)('A' + (n - 1) % 26) + letters;
+        return $"{letters}{row + 1:00}";
+    }
+}
+
+public static class Mosaic
+{
+    public static SKBitmap Render(string photoPath, string masterPath, Grid grid,
+        int column, int row, int size = 600, float opacity = 0.4f)
+    {
+        grid.Coordinate(column, row);
+        if (size is < 100 or > 2400 || !float.IsFinite(opacity) || opacity < 0 || opacity > 1)
+            throw new ArgumentOutOfRangeException(nameof(size));
+        using var master = LoadOriented(masterPath);
+        using var photo = LoadOriented(photoPath);
+        var tile = new SKBitmap(size, size);
+        try
+        {
+            using (var canvas = new SKCanvas(tile))
+            {
+                canvas.Clear(SKColors.White);
+                var photoCrop = CenterCrop(photo.Width, photo.Height, 1);
+                canvas.DrawBitmap(photo, photoCrop, new SKRect(0, 0, size, size), new SKSamplingOptions(SKFilterMode.Linear));
+                var crop = CenterCrop(master.Width, master.Height, (float)grid.Columns / grid.Rows);
+                var cell = new SKRect(crop.Left + column * crop.Width / grid.Columns,
+                    crop.Top + row * crop.Height / grid.Rows,
+                    crop.Left + (column + 1) * crop.Width / grid.Columns,
+                    crop.Top + (row + 1) * crop.Height / grid.Rows);
+                using var paint = new SKPaint { Color = SKColors.White.WithAlpha((byte)Math.Round(opacity * 255)) };
+                canvas.DrawBitmap(master, cell, new SKRect(0, 0, size, size), new SKSamplingOptions(SKFilterMode.Linear), paint);
+            }
+            return tile;
+        }
+        catch { tile.Dispose(); throw; }
+    }
+
+    private static SKRect CenterCrop(int width, int height, float aspect)
+    {
+        float w = width, h = height;
+        if (w / h > aspect) w = h * aspect;
+        else h = w / aspect;
+        return new SKRect((width - w) / 2, (height - h) / 2, (width + w) / 2, (height + h) / 2);
+    }
+
+    private static SKBitmap LoadOriented(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var codec = SKCodec.Create(stream) ?? throw new ArgumentException("Unbekanntes Bildformat.");
+        using var decoded = SKBitmap.Decode(codec) ?? throw new ArgumentException("Bild kann nicht gelesen werden.");
+        var origin = codec.EncodedOrigin;
+        bool swap = (int)origin >= 5;
+        var result = new SKBitmap(swap ? decoded.Height : decoded.Width, swap ? decoded.Width : decoded.Height);
+        using var canvas = new SKCanvas(result);
+        switch (origin)
+        {
+            case SKEncodedOrigin.TopRight: canvas.Translate(result.Width, 0); canvas.Scale(-1, 1); break;
+            case SKEncodedOrigin.BottomRight: canvas.Translate(result.Width, result.Height); canvas.RotateDegrees(180); break;
+            case SKEncodedOrigin.BottomLeft: canvas.Translate(0, result.Height); canvas.Scale(1, -1); break;
+            case SKEncodedOrigin.LeftTop: canvas.RotateDegrees(90); canvas.Scale(1, -1); break;
+            case SKEncodedOrigin.RightTop: canvas.Translate(result.Width, 0); canvas.RotateDegrees(90); break;
+            case SKEncodedOrigin.RightBottom: canvas.Translate(result.Width, result.Height); canvas.RotateDegrees(90); canvas.Scale(-1, 1); break;
+            case SKEncodedOrigin.LeftBottom: canvas.Translate(0, result.Height); canvas.RotateDegrees(-90); break;
+        }
+        canvas.DrawBitmap(decoded, 0, 0, new SKSamplingOptions(SKFilterMode.Nearest));
+        return result;
+    }
+
+    public static SKBitmap RenderMaster(string path, Grid grid)
+    {
+        grid.Validate();
+        using var source = LoadOriented(path);
+        int width = Math.Min(1600, grid.Columns * 100);
+        int height = Math.Max(1, (int)Math.Round((double)width * grid.Rows / grid.Columns));
+        if (height > 1600) { width = Math.Max(1, width * 1600 / height); height = 1600; }
+        var result = new SKBitmap(width, height);
+        using var canvas = new SKCanvas(result);
+        canvas.Clear(SKColors.White);
+        canvas.DrawBitmap(source, CenterCrop(source.Width, source.Height, (float)grid.Columns / grid.Rows),
+            new SKRect(0, 0, width, height), new SKSamplingOptions(SKFilterMode.Linear));
+        return result;
+    }
+}
