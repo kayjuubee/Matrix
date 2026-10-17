@@ -11,14 +11,18 @@ using MosaicGrid = Matrix.Core.Grid;
 
 namespace Matrix.Windows;
 
-public sealed record SavedPhoto(string Id, int Column, int Row);
-public sealed record SavedProject(int Columns, int Rows, List<SavedPhoto> Photos);
-
 public sealed class OperatorWindow : Window
 {
     private readonly TextBox columns = new() { Text = "20", Width = 70 };
     private readonly TextBox rows = new() { Text = "15", Width = 70 };
+    private readonly ComboBox format = new() { SelectedIndex = 0, Margin = new Thickness(0, 12, 0, 8), ItemsSource = new[] { "15 × 10 cm · Querformat", "10 × 15 cm · Hochformat" } };
     private readonly TextBlock status = new() { Text = "Neues Projekt anlegen oder ein gespeichertes Projekt öffnen.", TextWrapping = TextWrapping.Wrap };
+    private readonly TextBlock printStatus = new() { Text = "Zusatzdruck pausiert · noch kein Drucker gewählt", TextWrapping = TextWrapping.Wrap };
+    private readonly List<SavedPhoto> savedPhotos = [];
+    private string? printerName;
+    private bool printEnabled;
+    private bool printBusy;
+    private string? lastPrintError;
     private readonly TextBlock projectLabel = new() { TextWrapping = TextWrapping.Wrap };
     private readonly DispatcherTimer scan = new() { Interval = TimeSpan.FromSeconds(2) };
     private readonly Dictionary<string, (long Length, DateTime Modified)> observed = new(StringComparer.OrdinalIgnoreCase);
@@ -33,13 +37,16 @@ public sealed class OperatorWindow : Window
 
     public OperatorWindow()
     {
-        Title = "Matrix – Steuerung"; Width = 650; Height = 570; MinWidth = 550; MinHeight = 450;
-        var panel = new StackPanel { Margin = new Thickness(24) }; Content = panel;
+        Title = "Matrix – Steuerung"; Width = 650; Height = 820; MinWidth = 550; MinHeight = 450;
+        var panel = new StackPanel { Margin = new Thickness(24) };
+        Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         panel.Children.Add(new TextBlock { Text = "Matrix · Fotomosaik", FontSize = 28, Margin = new Thickness(0, 0, 0, 20) });
         var dimensions = new StackPanel { Orientation = Orientation.Horizontal };
         dimensions.Children.Add(new TextBlock { Text = "Spalten ", VerticalAlignment = VerticalAlignment.Center }); dimensions.Children.Add(columns);
         dimensions.Children.Add(new TextBlock { Text = "   Zeilen ", VerticalAlignment = VerticalAlignment.Center }); dimensions.Children.Add(rows);
         panel.Children.Add(dimensions);
+        panel.Children.Add(format);
+        panel.Children.Add(new TextBlock { Text = "Foto vollständig erhalten · Ränder bei abweichendem Seitenverhältnis", TextWrapping = TextWrapping.Wrap });
         panel.Children.Add(PresentationWindow.ActionButton("Neues Projekt mit Motiv anlegen …", CreateProject));
         panel.Children.Add(PresentationWindow.ActionButton("Gespeichertes Projekt öffnen …", OpenProject));
         panel.Children.Add(PresentationWindow.ActionButton("Präsentationsfenster öffnen", ShowPresentation));
@@ -52,6 +59,10 @@ public sealed class OperatorWindow : Window
             Text = "Präsentationsfenster auf den zweiten Bildschirm ziehen; F11 für Vollbild.\n← / → blättern · Leertaste Diashow · Ende neuestes Bild · Esc Fenster",
             TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 16)
         });
+        panel.Children.Add(PresentationWindow.ActionButton("Zusatzdruck einrichten / starten …", ConfigurePrinting));
+        panel.Children.Add(PresentationWindow.ActionButton("Zusatzdruck pausieren", () => { printEnabled = false; UpdatePrintStatus(); }));
+        panel.Children.Add(PresentationWindow.ActionButton("Ausgewähltes Bild drucken / nachdrucken", QueueSelectedPhoto));
+        panel.Children.Add(printStatus);
         panel.Children.Add(projectLabel); panel.Children.Add(status);
         scan.Tick += async (_, _) => await ScanFolder();
         Closed += (_, _) => { closing = true; scan.Stop(); presentation?.Close(); if (!busy) projectLock?.Dispose(); };
@@ -59,7 +70,7 @@ public sealed class OperatorWindow : Window
 
     private bool CanChangeProject()
     {
-        if (!busy) return true;
+        if (!busy && !printBusy) return true;
         status.Text = "Bitte warten, bis der laufende Import beendet ist."; return false;
     }
 
@@ -68,15 +79,16 @@ public sealed class OperatorWindow : Window
         if (!CanChangeProject()) return;
         try
         {
-            var nextGrid = new MosaicGrid(int.Parse(columns.Text), int.Parse(rows.Text)); nextGrid.Validate();
+            var nextGrid = new MosaicGrid(int.Parse(columns.Text), int.Parse(rows.Text), format.SelectedIndex == 1 ? PhotoFormat.Portrait10x15 : PhotoFormat.Landscape10x15); nextGrid.Validate();
             var dialog = new OpenFileDialog { Title = "Großes Motiv auswählen", Filter = ImageFilter };
             if (dialog.ShowDialog(this) != true) return;
+            if (!CanChangeProject()) return;
             // Decode before switching projects so an invalid motif leaves the previous project intact.
             using var preview = Mosaic.RenderMaster(dialog.FileName, nextGrid);
             string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Matrix", "Projects", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             File.Copy(dialog.FileName, Path.Combine(dir, "master"));
-            File.WriteAllText(Path.Combine(dir, "project.json"), JsonSerializer.Serialize(new SavedProject(nextGrid.Columns, nextGrid.Rows, [])));
+            File.WriteAllText(Path.Combine(dir, "project.json"), JsonSerializer.Serialize(new SavedProject(nextGrid.Columns, nextGrid.Rows, [], nextGrid.Format)));
             Activate(dir, nextGrid, new PresentationHistory(nextGrid));
         }
         catch (Exception ex) { status.Text = $"Projekt konnte nicht erstellt werden: {ex.Message}"; }
@@ -87,10 +99,11 @@ public sealed class OperatorWindow : Window
         if (!CanChangeProject()) return;
         var dialog = new OpenFileDialog { Title = "Matrix-Projekt öffnen", Filter = "Matrix-Projekt|project.json" };
         if (dialog.ShowDialog(this) != true) return;
+        if (!CanChangeProject()) return;
         try
         {
             var saved = JsonSerializer.Deserialize<SavedProject>(File.ReadAllText(dialog.FileName)) ?? throw new IOException("Leere Projektdatei.");
-            var nextGrid = new MosaicGrid(saved.Columns, saved.Rows); nextGrid.Validate();
+            var nextGrid = new MosaicGrid(saved.Columns, saved.Rows, saved.Format); nextGrid.Validate();
             var nextHistory = new PresentationHistory(nextGrid);
             string dir = Path.GetDirectoryName(dialog.FileName)!;
             using var preview = Mosaic.RenderMaster(Path.Combine(dir, "master"), nextGrid);
@@ -101,12 +114,12 @@ public sealed class OperatorWindow : Window
                 if (!File.Exists(tile)) throw new IOException($"Bilddatei fehlt: {tile}");
                 if (!nextHistory.Add(new(photo.Id, tile, photo.Column, photo.Row))) throw new IOException("Doppeltes Bild im Projekt.");
             }
-            Activate(dir, nextGrid, nextHistory);
+            Activate(dir, nextGrid, nextHistory, saved);
         }
         catch (Exception ex) { status.Text = $"Projekt konnte nicht geöffnet werden: {ex.Message}"; }
     }
 
-    private void Activate(string dir, MosaicGrid nextGrid, PresentationHistory nextHistory)
+    private void Activate(string dir, MosaicGrid nextGrid, PresentationHistory nextHistory, SavedProject? saved = null)
     {
         if (!string.Equals(dir, projectDirectory, StringComparison.OrdinalIgnoreCase))
         {
@@ -115,9 +128,15 @@ public sealed class OperatorWindow : Window
         }
         scan.Stop(); inputDirectory = null; observed.Clear(); presentation?.Close(); presentation = null;
         projectDirectory = dir; grid = nextGrid; history = nextHistory;
+        savedPhotos.Clear(); savedPhotos.AddRange((saved?.Photos ?? []).Select(PrintRecovery.AfterRestart));
+        printerName = saved?.PrinterName; printEnabled = false; lastPrintError = null; UpdatePrintStatus();
+        SaveProject();
         columns.Text = grid.Columns.ToString(); rows.Text = grid.Rows.ToString();
+        format.SelectedIndex = grid.Format == PhotoFormat.Square ? -1 : grid.Format == PhotoFormat.Portrait10x15 ? 1 : 0;
         projectLabel.Text = $"Projekt: {Path.Combine(dir, "project.json")}";
-        status.Text = $"{history.Items.Count} Bilder geladen. Fotos hinzufügen oder einen Eingangsordner wählen.";
+        status.Text = grid.Format == PhotoFormat.Square
+            ? "Altes quadratisches Projekt: nur Ansicht. Für 10 × 15 cm ein neues Projekt anlegen und Originalfotos importieren."
+            : $"{history.Items.Count} Bilder geladen · {(grid.Format == PhotoFormat.Landscape10x15 ? "15 × 10" : "10 × 15")} cm. Fotos hinzufügen oder einen Eingangsordner wählen.";
         ShowPresentation();
     }
 
@@ -140,7 +159,7 @@ public sealed class OperatorWindow : Window
 
     private async Task SelectPhotos()
     {
-        if (history is null || busy) return;
+        if (history is null || busy || !CanImportFormat()) return;
         var dialog = new OpenFileDialog { Filter = ImageFilter, Multiselect = true };
         if (dialog.ShowDialog(this) == true) await Import(dialog.FileNames);
     }
@@ -148,6 +167,7 @@ public sealed class OperatorWindow : Window
     private void WatchFolder()
     {
         if (history is null) { status.Text = "Bitte zuerst ein Projekt anlegen."; return; }
+        if (!CanImportFormat()) return;
         var dialog = new OpenFolderDialog { Title = "Fotobox-Eingangsordner auswählen" };
         if (dialog.ShowDialog(this) != true) return;
         var selected = Path.GetFullPath(dialog.FolderName).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
@@ -180,7 +200,7 @@ public sealed class OperatorWindow : Window
 
     private async Task Import(IEnumerable<string> files)
     {
-        if (busy || grid is null || history is null || projectDirectory is null) return;
+        if (busy || grid is null || history is null || projectDirectory is null || !CanImportFormat()) return;
         busy = true;
         try
         {
@@ -213,11 +233,11 @@ public sealed class OperatorWindow : Window
                             using var output = File.Create(tile + ".tmp"); data.SaveTo(output);
                         });
                         File.Move(tile + ".tmp", tile, true);
-                        var photos = history.Items.Select(x => new SavedPhoto(x.Id, x.Column, x.Row)).ToList();
-                        photos.Add(new(id, column, row));
-                        string manifest = Path.Combine(projectDirectory, "project.json");
-                        await File.WriteAllTextAsync(manifest + ".tmp", JsonSerializer.Serialize(new SavedProject(grid.Columns, grid.Rows, photos)));
-                        File.Move(manifest + ".tmp", manifest, true);
+                        // Remember extra-print requests before they can be sent to Windows.
+                        var entry = new SavedPhoto(id, column, row, printerName is null ? PrintState.NotRequested : PrintState.Pending);
+                        savedPhotos.Add(entry);
+                        try { SaveProject(); }
+                        catch { savedPhotos.RemoveAt(savedPhotos.Count - 1); throw; }
                         history.Add(new(id, tile, column, row));
                         presentation?.NewArrival();
                         status.Text = $"Neues Bild: {grid.Coordinate(column, row)} · {history.Items.Count} von {grid.Columns * grid.Rows}";
@@ -227,7 +247,104 @@ public sealed class OperatorWindow : Window
                 catch (Exception ex) { status.Text = $"{Path.GetFileName(path)}: {ex.Message}"; }
             }
         }
-        finally { busy = false; if (closing) projectLock?.Dispose(); }
+        finally
+        {
+            busy = false; if (closing) projectLock?.Dispose();
+            else { UpdatePrintStatus(); _ = ProcessPrintQueue(); }
+        }
+    }
+
+    private void SaveProject()
+    {
+        if (grid is null || projectDirectory is null) return;
+        string manifest = Path.Combine(projectDirectory, "project.json");
+        File.WriteAllText(manifest + ".tmp", JsonSerializer.Serialize(new SavedProject(grid.Columns, grid.Rows, savedPhotos, grid.Format, printerName)));
+        File.Move(manifest + ".tmp", manifest, true);
+    }
+
+    private void ConfigurePrinting()
+    {
+        if (grid is null || projectDirectory is null || busy || printBusy || !CanImportFormat()) return;
+        try
+        {
+            var selected = PhotoPrinter.Choose(this, grid.Format);
+            if (selected is null) return;
+            File.WriteAllBytes(Path.Combine(projectDirectory, "print-ticket.xml"), selected.Value.Ticket);
+            printerName = selected.Value.PrinterName; SaveProject();
+            printEnabled = true; lastPrintError = null; UpdatePrintStatus(); _ = ProcessPrintQueue();
+        }
+        catch (Exception ex) { printEnabled = false; printStatus.Text = $"Druckereinrichtung: {ex.Message}"; }
+    }
+
+    private void QueueSelectedPhoto()
+    {
+        if (busy || printBusy || history?.Current is null || printerName is null || !CanImportFormat())
+        { printStatus.Text = "Zuerst einen Drucker einrichten und ein Foto auswählen."; return; }
+        var current = history.Current;
+        int index = savedPhotos.FindIndex(p => p.Id == current.Id);
+        if (index < 0) return;
+        var previous = savedPhotos[index];
+        if (previous.PrintState is PrintState.Submitted or PrintState.NeedsReview &&
+            MessageBox.Show(this, "Dieses Foto könnte bereits gedruckt worden sein. Einen weiteren Ausdruck mit derselben Koordinate anfordern?",
+                "Nachdruck", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        try
+        {
+            savedPhotos[index] = previous with { PrintState = PrintState.Pending };
+            SaveProject(); UpdatePrintStatus(); _ = ProcessPrintQueue();
+        }
+        catch (Exception ex) { savedPhotos[index] = previous; printStatus.Text = $"Druckauftrag nicht gespeichert: {ex.Message}"; }
+    }
+
+    private void UpdatePrintStatus()
+    {
+        int pending = savedPhotos.Count(p => p.PrintState == PrintState.Pending);
+        int review = savedPhotos.Count(p => p.PrintState == PrintState.NeedsReview);
+        int submitted = savedPhotos.Count(p => p.PrintState == PrintState.Submitted);
+        printStatus.Text = $"Zusatzdruck {(printEnabled ? "aktiv" : "pausiert")} · {printerName ?? "kein Drucker"}\n" +
+            $"{pending} wartend · {submitted} an Windows übergeben · {review} manuell prüfen" +
+            (lastPrintError is null ? "" : $"\nDruck angehalten: {lastPrintError}");
+    }
+
+    private async Task ProcessPrintQueue()
+    {
+        if (printBusy || busy || !printEnabled || closing || printerName is null || projectDirectory is null || grid is null) return;
+        printBusy = true;
+        try
+        {
+            while (printEnabled && !closing)
+            {
+                // Let navigation, new arrivals and the pause button run between submissions.
+                await Dispatcher.Yield(DispatcherPriority.Background);
+                if (!printEnabled || closing || busy) break;
+                var photo = PrintRecovery.Next(savedPhotos);
+                if (photo is null) break;
+                int index = savedPhotos.FindIndex(p => p.Id == photo.Id);
+                try
+                {
+                    savedPhotos[index] = photo with { PrintState = PrintState.Submitting };
+                    SaveProject(); // Persist before calling the spooler to prevent blind duplicate retries.
+                    PhotoPrinter.Submit(printerName, Path.Combine(projectDirectory, "print-ticket.xml"),
+                        Path.Combine(projectDirectory, photo.Id + ".png"), grid.Coordinate(photo.Column, photo.Row));
+                    savedPhotos[index] = photo with { PrintState = PrintState.Submitted };
+                    SaveProject(); UpdatePrintStatus();
+                }
+                catch (Exception ex)
+                {
+                    savedPhotos[index] = photo with { PrintState = PrintState.NeedsReview };
+                    printEnabled = false;
+                    try { SaveProject(); } catch { /* The persisted Submitting state is recovered for manual review. */ }
+                    lastPrintError = ex.Message; UpdatePrintStatus();
+                }
+            }
+        }
+        finally { printBusy = false; }
+    }
+
+    private bool CanImportFormat()
+    {
+        if (grid?.Format != PhotoFormat.Square) return true;
+        status.Text = "Für 10 × 15 cm bitte ein neues Projekt anlegen. Das alte quadratische Projekt bleibt unverändert.";
+        return false;
     }
 
     private const string ImageFilter = "Bilder|*.jpg;*.jpeg;*.png;*.webp;*.bmp";

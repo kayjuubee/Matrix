@@ -2,12 +2,24 @@ using SkiaSharp;
 
 namespace Matrix.Core;
 
-public sealed record Grid(int Columns, int Rows)
+public enum PhotoFormat { Square, Landscape10x15, Portrait10x15 }
+
+public sealed record Grid(int Columns, int Rows, PhotoFormat Format = PhotoFormat.Landscape10x15)
 {
+    public double TileAspect => Format switch
+    {
+        PhotoFormat.Square => 1,
+        PhotoFormat.Landscape10x15 => 1.5,
+        PhotoFormat.Portrait10x15 => 1 / 1.5,
+        _ => throw new ArgumentOutOfRangeException(nameof(Format))
+    };
+    public double WallAspect => (double)Columns / Rows * TileAspect;
+
     public void Validate()
     {
         if (Columns is < 1 or > 100 || Rows is < 1 or > 100)
             throw new ArgumentOutOfRangeException(nameof(Columns), "Raster: jeweils 1 bis 100 Felder.");
+        _ = TileAspect;
     }
     public string Coordinate(int column, int row)
     {
@@ -24,28 +36,34 @@ public sealed record Grid(int Columns, int Rows)
 public static class Mosaic
 {
     public static SKBitmap Render(string photoPath, string masterPath, Grid grid,
-        int column, int row, int size = 600, float opacity = 0.4f)
+        int column, int row, int size = 1800, float opacity = 0.4f)
     {
         grid.Coordinate(column, row);
         if (size is < 100 or > 2400 || !float.IsFinite(opacity) || opacity < 0 || opacity > 1)
             throw new ArgumentOutOfRangeException(nameof(size));
         using var master = LoadOriented(masterPath);
         using var photo = LoadOriented(photoPath);
-        var tile = new SKBitmap(size, size);
+        int width = grid.TileAspect >= 1 ? size : (int)Math.Round(size * grid.TileAspect);
+        int height = grid.TileAspect >= 1 ? (int)Math.Round(size / grid.TileAspect) : size;
+        var tile = new SKBitmap(width, height);
         try
         {
             using (var canvas = new SKCanvas(tile))
             {
                 canvas.Clear(SKColors.White);
-                var photoCrop = CenterCrop(photo.Width, photo.Height, 1);
-                canvas.DrawBitmap(photo, photoCrop, new SKRect(0, 0, size, size), new SKSamplingOptions(SKFilterMode.Linear));
-                var crop = CenterCrop(master.Width, master.Height, (float)grid.Columns / grid.Rows);
+                // Fit the complete photo without cropping, stretching or implicit rotation.
+                float scale = Math.Min((float)width / photo.Width, (float)height / photo.Height);
+                float photoWidth = photo.Width * scale, photoHeight = photo.Height * scale;
+                var destination = new SKRect((width - photoWidth) / 2, (height - photoHeight) / 2,
+                    (width + photoWidth) / 2, (height + photoHeight) / 2);
+                canvas.DrawBitmap(photo, new SKRect(0, 0, photo.Width, photo.Height), destination, new SKSamplingOptions(SKFilterMode.Linear));
+                var crop = CenterCrop(master.Width, master.Height, (float)grid.WallAspect);
                 var cell = new SKRect(crop.Left + column * crop.Width / grid.Columns,
                     crop.Top + row * crop.Height / grid.Rows,
                     crop.Left + (column + 1) * crop.Width / grid.Columns,
                     crop.Top + (row + 1) * crop.Height / grid.Rows);
                 using var paint = new SKPaint { Color = SKColors.White.WithAlpha((byte)Math.Round(opacity * 255)) };
-                canvas.DrawBitmap(master, cell, new SKRect(0, 0, size, size), new SKSamplingOptions(SKFilterMode.Linear), paint);
+                canvas.DrawBitmap(master, cell, new SKRect(0, 0, width, height), new SKSamplingOptions(SKFilterMode.Linear), paint);
             }
             return tile;
         }
@@ -88,12 +106,12 @@ public static class Mosaic
         grid.Validate();
         using var source = LoadOriented(path);
         int width = Math.Min(1600, grid.Columns * 100);
-        int height = Math.Max(1, (int)Math.Round((double)width * grid.Rows / grid.Columns));
+        int height = Math.Max(1, (int)Math.Round(width / grid.WallAspect));
         if (height > 1600) { width = Math.Max(1, width * 1600 / height); height = 1600; }
         var result = new SKBitmap(width, height);
         using var canvas = new SKCanvas(result);
         canvas.Clear(SKColors.White);
-        canvas.DrawBitmap(source, CenterCrop(source.Width, source.Height, (float)grid.Columns / grid.Rows),
+        canvas.DrawBitmap(source, CenterCrop(source.Width, source.Height, (float)grid.WallAspect),
             new SKRect(0, 0, width, height), new SKSamplingOptions(SKFilterMode.Linear));
         return result;
     }

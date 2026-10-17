@@ -29,14 +29,14 @@ public class MosaicTests
                 for (int y = 0; y < 200; y++) for (int x = 200; x < 400; x++) master.SetPixel(x, y, SKColors.Blue);
                 Save(master, masterPath);
             }
-            using var tile = Mosaic.Render(photoPath, masterPath, new Grid(2, 1), 1, 0, 200, 0.5f);
+            using var tile = Mosaic.Render(photoPath, masterPath, new Grid(2, 1, PhotoFormat.Square), 1, 0, 200, 0.5f);
             Assert.Equal(200, tile.Width);
             var pixel = tile.GetPixel(100, 100);
             Assert.InRange(pixel.Red, (byte)126, (byte)129);
             Assert.Equal((byte)255, pixel.Blue);
             Assert.Equal(pixel, tile.GetPixel(0, 0)); // No coordinate or white label on the print.
             Assert.Equal(pixel, tile.GetPixel(10, 10));
-            using var preview = Mosaic.RenderMaster(masterPath, new Grid(2, 1));
+            using var preview = Mosaic.RenderMaster(masterPath, new Grid(2, 1, PhotoFormat.Square));
             Assert.Equal(preview.Width, preview.Height * 2);
             Assert.Equal(SKColors.Red, preview.GetPixel(25, 50));
             Assert.Equal(SKColors.Blue, preview.GetPixel(175, 50));
