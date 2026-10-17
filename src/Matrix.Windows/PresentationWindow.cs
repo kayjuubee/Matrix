@@ -31,6 +31,7 @@ public sealed class PresentationWindow : Window
     private readonly Image photo = new() { Stretch = Stretch.Uniform };
     private readonly TextBlock coordinate = new() { FontSize = 64, FontWeight = FontWeights.Bold, Foreground = Brushes.White };
     private readonly TextBlock position = new() { FontSize = 18, Foreground = Brushes.LightGray };
+    private readonly TextBlock remaining = new() { FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
     private readonly Button play;
     private readonly DispatcherTimer slideshow = new() { Interval = TimeSpan.FromSeconds(8) };
     private readonly Dictionary<string, Rectangle> occupied = [];
@@ -81,7 +82,7 @@ public sealed class PresentationWindow : Window
         var side = new DockPanel { Margin = new Thickness(20) };
         System.Windows.Controls.Grid.SetColumn(side, 1); layout.Children.Add(side);
         var info = new StackPanel { Margin = new Thickness(0, 12, 0, 12) };
-        info.Children.Add(coordinate); info.Children.Add(position);
+        info.Children.Add(remaining); info.Children.Add(coordinate); info.Children.Add(position);
         DockPanel.SetDock(info, Dock.Bottom); side.Children.Add(info); side.Children.Add(photo);
         slideshow.Tick += (_, _) => { history.Tick(); Refresh(); };
         KeyDown += (_, e) =>
@@ -156,6 +157,8 @@ public sealed class PresentationWindow : Window
 
     private void Refresh()
     {
+        int missing = GridPlanning.Remaining(mosaicGrid, history.Items.Count);
+        remaining.Text = missing == 0 ? "Mosaik vollständig!" : $"{missing} {(missing == 1 ? "Bild fehlt" : "Bilder fehlen")} noch";
         play.Content = history.IsPlaying ? "Diashow pausieren" : "Diashow starten";
         if (!history.IsPlaying) slideshow.Stop();
         foreach (var item in history.Items)
@@ -197,7 +200,7 @@ public sealed class PresentationWindow : Window
     {
         using var stream = File.OpenRead(path); return ReadSource(stream, decodeWidth);
     }
-    private static BitmapImage ToSource(SKBitmap bitmap)
+    internal static BitmapImage ToSource(SKBitmap bitmap)
     {
         using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
         using var stream = data.AsStream(); return ReadSource(stream);

@@ -13,9 +13,6 @@ namespace Matrix.Windows;
 
 public sealed class OperatorWindow : Window
 {
-    private readonly TextBox columns = new() { Text = "20", Width = 70 };
-    private readonly TextBox rows = new() { Text = "15", Width = 70 };
-    private readonly ComboBox format = new() { SelectedIndex = 0, Margin = new Thickness(0, 12, 0, 8), ItemsSource = new[] { "15 × 10 cm · Querformat", "10 × 15 cm · Hochformat" } };
     private readonly TextBlock status = new() { Text = "Neues Projekt anlegen oder ein gespeichertes Projekt öffnen.", TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock printStatus = new() { Text = "Zusatzdruck pausiert · noch kein Drucker gewählt", TextWrapping = TextWrapping.Wrap };
     private readonly List<SavedPhoto> savedPhotos = [];
@@ -41,13 +38,7 @@ public sealed class OperatorWindow : Window
         var panel = new StackPanel { Margin = new Thickness(24) };
         Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         panel.Children.Add(new TextBlock { Text = "Matrix · Fotomosaik", FontSize = 28, Margin = new Thickness(0, 0, 0, 20) });
-        var dimensions = new StackPanel { Orientation = Orientation.Horizontal };
-        dimensions.Children.Add(new TextBlock { Text = "Spalten ", VerticalAlignment = VerticalAlignment.Center }); dimensions.Children.Add(columns);
-        dimensions.Children.Add(new TextBlock { Text = "   Zeilen ", VerticalAlignment = VerticalAlignment.Center }); dimensions.Children.Add(rows);
-        panel.Children.Add(dimensions);
-        panel.Children.Add(format);
-        panel.Children.Add(new TextBlock { Text = "Foto vollständig erhalten · Ränder bei abweichendem Seitenverhältnis", TextWrapping = TextWrapping.Wrap });
-        panel.Children.Add(PresentationWindow.ActionButton("Neues Projekt mit Motiv anlegen …", CreateProject));
+        panel.Children.Add(PresentationWindow.ActionButton("Neues Projekt: zuerst Logo auswählen …", CreateProject));
         panel.Children.Add(PresentationWindow.ActionButton("Gespeichertes Projekt öffnen …", OpenProject));
         panel.Children.Add(PresentationWindow.ActionButton("Präsentationsfenster öffnen", ShowPresentation));
         var import = PresentationWindow.ActionButton("Fotos hinzufügen …", () => _ = SelectPhotos()); panel.Children.Add(import);
@@ -79,12 +70,12 @@ public sealed class OperatorWindow : Window
         if (!CanChangeProject()) return;
         try
         {
-            var nextGrid = new MosaicGrid(int.Parse(columns.Text), int.Parse(rows.Text), format.SelectedIndex == 1 ? PhotoFormat.Portrait10x15 : PhotoFormat.Landscape10x15); nextGrid.Validate();
             var dialog = new OpenFileDialog { Title = "Großes Motiv auswählen", Filter = ImageFilter };
             if (dialog.ShowDialog(this) != true) return;
             if (!CanChangeProject()) return;
-            // Decode before switching projects so an invalid motif leaves the previous project intact.
-            using var preview = Mosaic.RenderMaster(dialog.FileName, nextGrid);
+            var setup = new GridSetupWindow(dialog.FileName) { Owner = this };
+            if (setup.ShowDialog() != true || setup.SelectedGrid is not { } nextGrid) return;
+            if (!CanChangeProject()) return;
             string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Matrix", "Projects", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(dir);
             File.Copy(dialog.FileName, Path.Combine(dir, "master"));
@@ -131,8 +122,6 @@ public sealed class OperatorWindow : Window
         savedPhotos.Clear(); savedPhotos.AddRange((saved?.Photos ?? []).Select(PrintRecovery.AfterRestart));
         printerName = saved?.PrinterName; printEnabled = false; lastPrintError = null; UpdatePrintStatus();
         SaveProject();
-        columns.Text = grid.Columns.ToString(); rows.Text = grid.Rows.ToString();
-        format.SelectedIndex = grid.Format == PhotoFormat.Square ? -1 : grid.Format == PhotoFormat.Portrait10x15 ? 1 : 0;
         projectLabel.Text = $"Projekt: {Path.Combine(dir, "project.json")}";
         status.Text = grid.Format == PhotoFormat.Square
             ? "Altes quadratisches Projekt: nur Ansicht. Für 10 × 15 cm ein neues Projekt anlegen und Originalfotos importieren."
@@ -219,8 +208,8 @@ public sealed class OperatorWindow : Window
                     if (history.Items.Any(x => x.Id == id)) continue;
                     if (history.Items.Count >= grid.Columns * grid.Rows)
                     { status.Text = "Die Matrix ist vollständig belegt. Es werden keine weiteren Felder vergeben."; scan.Stop(); break; }
-                    var used = history.Items.Select(x => x.Row * grid.Columns + x.Column).ToHashSet();
-                    int cell = Enumerable.Range(0, grid.Columns * grid.Rows).First(x => !used.Contains(x));
+                    int cell = GridPlanning.RandomFreeCell(grid, history.Items)
+                        ?? throw new InvalidOperationException("Die Matrix ist vollständig belegt.");
                     int column = cell % grid.Columns, row = cell / grid.Columns;
                     string snapshot = Path.Combine(projectDirectory, "source.tmp"), tile = Path.Combine(projectDirectory, id + ".png");
                     try

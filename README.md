@@ -12,9 +12,14 @@ Voraussetzung: .NET SDK 10.0 unter Windows (siehe global.json).
 dotnet run --project src/Matrix.Windows
 ```
 
-1. Spalten, Zeilen und Papierausrichtung einstellen (Standard: 15 × 10 cm Querformat),
-   dann „Neues Projekt mit Motiv anlegen“ wählen.
-2. Das große Motiv auswählen. Das Präsentationsfenster öffnet sich separat.
+1. „Neues Projekt: zuerst Logo auswählen“ wählen und das große Motiv öffnen.
+2. Im Planungsfenster die ungefähre Bildanzahl (Standard: 300) und Papierausrichtung
+   einstellen. Das Programm schlägt Spalten und Zeilen anhand des ausgerichteten
+   Logo-Seitenverhältnisses und der rechteckigen Kacheln vor. Der Vorschlag wägt
+   möglichst wenig Motivbeschnitt gegen die gewünschte Bildanzahl ab. Spalten und
+   Zeilen können manuell geändert werden. Vorschau, tatsächliche Bildanzahl und
+   nominelle Wandmaße prüfen, dann „Projekt mit diesem Raster erstellen“ wählen.
+   Das Präsentationsfenster öffnet sich separat.
 3. Das Fenster auf den zweiten Bildschirm ziehen, mit F11 maximieren.
 4. „Fotos hinzufügen“ oder „Eingangsordner überwachen“ wählen.
 
@@ -33,6 +38,10 @@ Fotokachel mit Motivüberlagerung, wie sie später ausgedruckt werden kann.
   auf den das Fenster vorher gezogen wurde.
 - **Neues Bild**: springt immer sofort auf dieses Bild, auch beim Zurückblättern
   oder in Pause. Eine laufende Diashow läuft nach acht Sekunden weiter.
+- **Restanzeige**: zeigt groß, wie viele Fotos noch bis zur vollständigen Matrix
+  fehlen. Bei null erscheint „Mosaik vollständig!“. Gezählt werden erfolgreich
+  importierte, unterschiedliche Bilder, keine Druckaufträge. Zurückblättern,
+  doppelte Dateien und Nachdrucke verändern den Restzähler nicht.
 
 Mit **„Fotomosaik anzeigen“** wird statt des reinen Motivs die wachsende Gesamtwand
 angezeigt: belegte Felder zeigen genau die erzeugten Kacheln mit Motivüberlagerung,
@@ -63,17 +72,18 @@ Die Ordnerprüfung läuft alle zwei Sekunden und liest auch vorhandene Bilder ei
 Dateien müssen bei zwei Prüfungen dieselbe Größe und Änderungszeit haben und zum
 Kopieren exklusiv lesbar sein. Noch gesperrte oder nicht lesbare Dateien werden
 bei späteren Prüfungen erneut versucht. PNG, JPEG, WebP und BMP werden unterstützt.
-Identische Dateiinhalte werden per SHA-256 nur einmal vergeben. Die erste Version
-vergibt freie Felder der Reihe nach; bei voller Matrix stoppt die Überwachung.
+Identische Dateiinhalte werden per SHA-256 nur einmal vergeben. Jedes neue Bild
+bekommt zufällig eines der noch freien Felder; keine Position wird doppelt vergeben.
+Gespeicherte Positionen bleiben beim Wiederöffnen und beim Nachdruck erhalten.
+Bei voller Matrix stoppt die Überwachung.
 Eingangs- und Projektordner müssen getrennt sein. „Importiert“ bedeutet weder
 „gedruckt“ noch „aufgeklebt“.
 
 ## Bildformat und DNP RX1
 
 Neue Projekte verwenden rechteckige 10 × 15-cm-Kacheln: standardmäßig Querformat
-(15 cm breit, 10 cm hoch), wahlweise Hochformat. Die Ausrichtung wird pro Projekt
-fest gespeichert. Eine Änderung der Auswahl wirkt erst beim Anlegen eines neuen
-Projekts. Auch Raster, Hervorhebung und Motivzuschnitt verwenden dieses Format.
+(15 cm breit, 10 cm hoch), wahlweise Hochformat. Die Ausrichtung wird bei der Planung gewählt und pro Projekt
+fest gespeichert. Auch Raster, Hervorhebung und Motivzuschnitt verwenden dieses Format.
 Beispiel: 5 × 5 Kacheln im Querformat ergeben nominell eine Wand von 75 × 50 cm.
 
 Fotos werden anhand ihrer EXIF-Orientierung ausgerichtet und **vollständig,
@@ -158,11 +168,15 @@ Unter Linux lässt sich die WPF-Anwendung mit `EnableWindowsTargeting` kompilier
 aber nicht ausführen. Automatisierte Tests prüfen Motivzuschnitt, Überlagerung,
 koordinatenfreie Ausgabe, vollständige Fotoecken, Einpassung ohne Verzerrung,
 rechteckige Rastergeometrie und Formatpersistenz sowie Historie, Diashow,
-Vorrang neuer Bilder und die sichere Wiederaufnahme von Druckaufträgen.
+Vorrang neuer Bilder und die sichere Wiederaufnahme von Druckaufträgen. Weitere
+Tests prüfen Rastervorschläge für verschiedene Logoformate und Bildanzahlen,
+Zufallsvergabe ohne doppelte Felder bis zur vollständig belegten Matrix und den
+von der Diashow unabhängigen Restzähler.
 
 Manuelle Abnahme unter Windows:
 
-1. 5 × 5 Projekt anlegen, Präsentationsfenster auf zweiten Bildschirm verschieben.
+1. Logo zuerst wählen, Bildanzahl 25 eingeben, Vorschlag prüfen und bei Bedarf
+   manuell 5 × 5 wählen. Präsentationsfenster auf zweiten Bildschirm verschieben.
 2. Drei Fotos importieren; Koordinate, orange Markierung und Fotokachel abgleichen.
 3. Zurückblättern, Diashow starten/pausieren und ein weiteres Foto hinzufügen:
    In beiden Zuständen muss sofort das neue Bild erscheinen; bei laufender Diashow
@@ -186,10 +200,14 @@ Manuelle Abnahme unter Windows:
     Zu „Nur Motiv anzeigen“ zurückschalten und wieder öffnen: Vorschau aus dem Cache.
     Währenddessen ein Foto importieren: Gesamtwand ergänzt die neue Kachel automatisch,
     Foto, Koordinate und aktuelle Markierung springen auf das neue Bild.
+12. Neues Bild importieren: zufälliges freies Feld, Restzähler sinkt genau um eins.
+    Zurückblättern und dieselbe Datei erneut einlesen: Restzähler unverändert.
+    Projekt neu laden: Feldzuordnung und Restzahl bleiben gleich; bei vollständiger
+    Matrix erscheint die Fertigmeldung.
 
 ## Noch offen
 
 Abnahme am echten DNP RX1 einschließlich gemeinsamem Betrieb mit DSLRBooth/LumaBooth;
-zufällige oder farboptimierte Feldvergabe; Rasterplan für die physische Wand.
+farboptimierte Feldvergabe; Rasterplan für die physische Wand.
 Die Windows-Oberfläche muss zusätzlich auf einem echten Windows-System und der
 Druckablauf mit dem vorgesehenen Drucker geprüft werden.

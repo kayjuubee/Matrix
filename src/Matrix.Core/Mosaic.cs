@@ -35,6 +35,13 @@ public sealed record Grid(int Columns, int Rows, PhotoFormat Format = PhotoForma
 
 public static class Mosaic
 {
+    public static (int Width, int Height) ReadOrientedSize(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var codec = SKCodec.Create(stream) ?? throw new ArgumentException("Unbekanntes Bildformat.");
+        return (int)codec.EncodedOrigin >= 5 ? (codec.Info.Height, codec.Info.Width) : (codec.Info.Width, codec.Info.Height);
+    }
+
     public static SKBitmap Render(string photoPath, string masterPath, Grid grid,
         int column, int row, int size = 1800, float opacity = 0.4f)
     {
