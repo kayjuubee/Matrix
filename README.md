@@ -8,7 +8,15 @@ Eine Übersicht der Funktionen pro Gerät steht in [Geräteübersicht](docs/GERA
 
 ## Windows-Anwendung
 
-Voraussetzung: .NET SDK 10.0 unter Windows (siehe global.json).
+**Ohne PowerShell starten:** [Matrix für Windows herunterladen](https://github.com/kayjuubee/Matrix/releases/download/windows-download/Matrix-Windows-x64.zip),
+ZIP vollständig entpacken und **Matrix.Windows.exe** doppelklicken. Die portable
+64-Bit-Version enthält .NET; eine separate SDK-Installation ist nicht nötig.
+Der erste Download wird nach dem erfolgreichen GitHub-Build bereitgestellt und
+bei Änderungen an `main` aktualisiert. Die EXE ist derzeit nicht digital signiert.
+Projekte bleiben unter `%LOCALAPPDATA%\Matrix\Projects` gespeichert.
+
+**Aus dem Quellcode starten:** Voraussetzung ist .NET SDK 10.0 unter Windows
+(siehe global.json).
 
 ```powershell
 dotnet run --project src/Matrix.Windows
@@ -517,3 +525,17 @@ Die Vorschau folgt derselben Fotoauswahl wie die Präsentation.
 Das Layout ist an typische Fotobox-Oberflächen angelehnt. Matrix bleibt eine
 eigenständige Anwendung neben DSLRBooth / LumaBooth. Eine Cloud-Projektverwaltung
 oder ein automatischer Cloud-Upload ist nicht enthalten.
+
+### Windows-EXE selbst erstellen
+
+```powershell
+dotnet publish src/Matrix.Windows/Matrix.Windows.csproj -p:PublishProfile=WindowsPortable
+```
+
+Die Ausgabe liegt in `output/windows/Matrix.Windows.exe`. Die Veröffentlichung
+enthält die Windows-Laufzeit und native Bibliotheken in einer EXE. Beim Start
+werden native Bibliotheken in den temporären .NET-Ordner entpackt; dieser muss
+beschreibbar sein. Die Anwendung darf nicht getrimmt werden (WPF). Die
+GitHub-Aktion testet zuerst Linux und Windows und erstellt danach das ZIP unter
+„Releases → Matrix für Windows“. Ein echter Windows-Start und ein RX1-Probedruck
+bleiben als Geräteprüfung erforderlich.

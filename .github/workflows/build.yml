@@ -16,3 +16,39 @@ jobs:
       - run: dotnet restore Matrix.sln
       - run: dotnet build Matrix.sln --no-restore --configuration Release
       - run: dotnet test Matrix.sln --no-build --configuration Release
+  windows-download:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build standalone Windows EXE
+        run: dotnet publish src/Matrix.Windows/Matrix.Windows.csproj -p:PublishProfile=WindowsPortable
+      - name: Package download
+        shell: pwsh
+        run: |
+          if (!(Test-Path output/windows/Matrix.Windows.exe)) { throw 'Windows EXE fehlt' }
+          Compress-Archive -Path output/windows/Matrix.Windows.exe -DestinationPath output/Matrix-Windows-x64.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Matrix-Windows-x64
+          path: output/Matrix-Windows-x64.zip
+          if-no-files-found: error
+      - name: Update Windows download
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release view windows-download *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create windows-download --title 'Matrix für Windows' --notes 'Portable Windows-Version (64 Bit). ZIP entpacken und Matrix.Windows.exe starten. .NET ist enthalten. Automatisch aus main erstellt; kein signiertes Installationsprogramm.' --prerelease
+            if ($LASTEXITCODE -ne 0) { throw 'Release konnte nicht erstellt werden' }
+          }
+          gh release upload windows-download output/Matrix-Windows-x64.zip --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Download konnte nicht hochgeladen werden' }
