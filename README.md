@@ -4,6 +4,8 @@ Fotomosaik für Veranstaltungen: Fotos werden mit Ausschnitten eines großen Mot
 überlagert. Ein separates Präsentationsfenster zeigt, wo jedes Foto an der Wand
 hingehört. Die ausgegebenen PNGs enthalten **keine Koordinaten und kein Raster**.
 
+Eine Übersicht der Funktionen pro Gerät steht in [Geräteübersicht](docs/GERAETE.md).
+
 ## Windows-Anwendung
 
 Voraussetzung: .NET SDK 10.0 unter Windows (siehe global.json).
@@ -72,6 +74,27 @@ am Fotobox-Rechner eingerichtet. Danach lassen sich aus dem Browser bedienen:
 - Mosaikansicht auf dem Präsentationsbildschirm umschalten;
 - Ordnerüberwachung und Zusatzdruck pausieren/fortsetzen;
 - für ein konkret ausgewähltes Foto einen bestätigten Zusatz-/Nachdruck anfordern.
+
+### Zweiter Bildschirm als Browseranzeige
+
+Über **„Zweiten Bildschirm im Browser öffnen“** oder die Adresse der Steuerung mit
+`/presentation` am Ende wird eine eigene Vollbildanzeige geöffnet. Sie zeigt
+Raster/Mosaik, markiertes Feld, aktuelle Fotokachel, Koordinate und Restzähler.
+Einmal mit dem Bedien-Zugangscode anmelden; über „Vollbild“ oder F11 auf dem
+gewünschten Bildschirm anzeigen. Sie funktioniert auch auf einem anderen Rechner
+im WLAN oder über die private Tailscale-Verbindung, ohne dort Matrix zu installieren.
+
+Auswahl, Motiv-/Mosaikmodus und Acht-Sekunden-Diashow teilen sich Windows-Fenster
+und Browser. Der Diashow-Takt läuft jetzt zentral im Fotobox-PC; das native
+Präsentationsfenster darf geschlossen werden. Die Browseranzeige liest den Zustand
+ungefähr jede Sekunde und kann entsprechend leicht verzögert sein. Bei einem
+neuen Foto wird dessen Koordinate sofort angezeigt; bis die passende Fotodatei
+geladen ist, erscheint „Bild lädt“ statt des vorherigen Fotos unter einer falschen
+Koordinate. Bei Verbindungsverlust bleibt der letzte Stand mit Warnung sichtbar.
+
+Die Anzeige enthält keine Druckknöpfe. Steuern lässt sie sich über Windows oder
+die separate Browser-Steuerung. Sie nutzt deren privaten Bedienzugang und ist
+nicht die öffentliche Gäste-QR-Vorschau auf Port 8788.
 
 ### Auf dem Fotobox-Rechner und im WLAN
 
@@ -356,7 +379,8 @@ Tests prüfen Rastervorschläge für verschiedene Logoformate und Bildanzahlen,
 Zufallsvergabe ohne doppelte Felder bis zur vollständig belegten Matrix und den
 von der Diashow unabhängigen Restzähler. Echte HTTP-Tests prüfen den Webserver,
 Anmeldeschutz für Status/Bilder/Befehle, Loginbegrenzung, Sitzungswiderruf und die
-Vermeidung doppelter Befehlsausführung bei parallelen Wiederholungen. Zusätzliche
+Vermeidung doppelter Befehlsausführung bei parallelen Wiederholungen. Die Browser-
+Präsentationsseite sowie projektgebundene Bildanfragen werden ebenfalls geprüft. Zusätzliche
 Tests prüfen Gästezugang, fehlende Schreib-/Druckrouten, Trennung der Zugangstoken,
 Projektbindung, Linkvalidierung und QR-PNG-Erzeugung. Die Abschlussplanung und
 vollfarbige Motivkacheln ohne Foto werden ebenfalls geprüft.
@@ -415,3 +439,9 @@ Abnahme am echten DNP RX1 einschließlich gemeinsamem Betrieb mit DSLRBooth/Luma
 farboptimierte Feldvergabe; Rasterplan für die physische Wand.
 Die Windows-Oberfläche muss zusätzlich auf einem echten Windows-System und der
 Druckablauf mit dem vorgesehenen Drucker geprüft werden.
+
+Zusätzliche Abnahme Browser-Präsentation: `/presentation` auf einem zweiten
+Rechner öffnen und anmelden. Vom Handy Bilder wechseln und Diashow starten;
+Foto, Koordinate, Markierung und Restzahl müssen folgen. Natives Fenster schließen:
+Browser-Diashow läuft weiter. Ein neues Bild muss für ein volles Diaintervall
+zentral ausgewählt bleiben. Projektwechsel und Verbindungsunterbrechung prüfen.

@@ -53,13 +53,14 @@ public sealed class RemoteServer : IAsyncDisposable
         });
         app.UseRateLimiter();
         app.MapGet("/", () => Results.Text(ReadPage(), "text/html; charset=utf-8"));
+        app.MapGet("/presentation", () => Results.Text(ReadPage("presentation"), "text/html; charset=utf-8"));
         app.MapPost("/login", (LoginRequest request) => SecureEquals(request.Code?.Trim().ToUpperInvariant() ?? "", AccessCode)
             ? Results.Ok(new { token }) : Results.Unauthorized()).RequireRateLimiting("login");
         app.MapGet("/api/state", () => controller.ReadState());
-        app.MapGet("/api/images/{id}", async (string id, bool? large) =>
+        app.MapGet("/api/images/{id}", async (string id, bool? large, string? project) =>
         {
             if (id != "master" && (id.Length != 64 || id.Any(c => !Uri.IsHexDigit(c)))) return Results.NotFound();
-            var image = await controller.ReadImage(id, large == true);
+            var image = await controller.ReadImage(id, large == true, project);
             return image is null ? Results.NotFound() : Results.File(image, "image/png");
         });
         app.MapPost("/api/command", async (RemoteCommand command) =>
@@ -90,9 +91,9 @@ public sealed class RemoteServer : IAsyncDisposable
     }
 
     private static bool SecureEquals(string a, string b) => CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(a), Encoding.UTF8.GetBytes(b));
-    private static string ReadPage()
+    private static string ReadPage(string page = "control")
     {
-        using var stream = typeof(RemoteServer).Assembly.GetManifestResourceStream("Matrix.Remote.control.html")!;
+        using var stream = typeof(RemoteServer).Assembly.GetManifestResourceStream($"Matrix.Remote.{page}.html")!;
         using var reader = new StreamReader(stream); return reader.ReadToEnd();
     }
     private sealed record LoginRequest(string? Code);

@@ -26,6 +26,11 @@ public sealed partial class OperatorWindow
         {
             if (remoteServer is not null) Process.Start(new ProcessStartInfo("http://127.0.0.1:8787") { UseShellExecute = true });
         }));
+        panel.Children.Add(PresentationWindow.ActionButton("Zweiten Bildschirm im Browser öffnen", () =>
+        {
+            if (remoteServer is not null) Process.Start(new ProcessStartInfo("http://127.0.0.1:8787/presentation") { UseShellExecute = true });
+            else remoteInfo.Text = "Bitte zuerst die Browser-Steuerung starten.";
+        }));
         panel.Children.Add(PresentationWindow.ActionButton("Browser-Steuerung stoppen", async () => await StopRemote()));
         panel.Children.Add(remoteInfo);
     }
@@ -77,7 +82,7 @@ public sealed partial class OperatorWindow
         return new(projectDirectory is null ? null : Path.GetFileName(projectDirectory), grid?.Columns ?? 0, grid?.Rows ?? 0,
             grid?.TileAspect ?? 1.5, grid is null ? 0 : grid.Columns * grid.Rows,
             grid is null ? 0 : GridPlanning.Remaining(grid, photos.Length), photos, history?.Current?.Id,
-            history?.IsPlaying ?? false, presentation?.MosaicVisible ?? false, scan.IsEnabled, printEnabled, printerName, lastPrintError);
+            history?.IsPlaying ?? false, mosaicVisible, scan.IsEnabled, printEnabled, printerName, lastPrintError);
     }
 
     private RemoteResult RemoteExecute(RemoteCommand command)
@@ -87,9 +92,21 @@ public sealed partial class OperatorWindow
         switch (command.Action)
         {
             case "previous": case "next": case "latest": case "select": case "slideshow": case "mosaic": case "presentation":
-                // Navigation must not repeatedly steal focus from the photobooth application.
-                if (presentation is null || command.Action == "presentation") ShowPresentation();
-                return new(presentation?.RemoteAction(command.Action, command.ImageId) == true, "Präsentationssteuerung aktualisiert.");
+                if (command.Action == "presentation") { ShowPresentation(); return new(presentation is not null, "Windows-Präsentation geöffnet."); }
+                if (presentation is not null)
+                    return new(presentation.RemoteAction(command.Action, command.ImageId), "Präsentationssteuerung aktualisiert.");
+                // Browser-only presentation: the shared clock and selection do not require a native window.
+                switch (command.Action)
+                {
+                    case "previous": history.Previous(); break;
+                    case "next": history.Next(); break;
+                    case "latest": history.Latest(); break;
+                    case "select": if (command.ImageId is null || !history.Select(command.ImageId)) return new(false, "Foto nicht verfügbar."); break;
+                    case "slideshow": history.ToggleSlideshow(); break;
+                    case "mosaic": mosaicVisible = !mosaicVisible; break;
+                }
+                ResetPresentationClock();
+                return new(true, "Browser-Präsentation aktualisiert.");
             case "monitor-pause": scan.Stop(); return new(true, "Import pausiert. Laufender Import wird noch abgeschlossen.");
             case "monitor-resume":
                 if (completing) return new(false, "Veranstaltungsabschluss läuft. Bitte zuerst abschließen oder abbrechen.");

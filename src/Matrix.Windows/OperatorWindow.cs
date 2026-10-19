@@ -26,6 +26,8 @@ public sealed partial class OperatorWindow : Window
     private PresentationHistory? history;
     private MosaicGrid? grid;
     private PresentationWindow? presentation;
+    private bool mosaicVisible;
+    private readonly DispatcherTimer presentationClock = new() { Interval = TimeSpan.FromSeconds(8) };
     private string? projectDirectory;
     private string? inputDirectory;
     private FileStream? projectLock;
@@ -60,7 +62,8 @@ public sealed partial class OperatorWindow : Window
         AddRemoteControls(panel);
         AddPreviewSharing(panel);
         scan.Tick += async (_, _) => await ScanFolder();
-        Closed += async (_, _) => { closing = true; scan.Stop(); presentation?.Close(); if (!busy) projectLock?.Dispose(); if (remoteServer is not null) await remoteServer.DisposeAsync(); if (guestServer is not null) await guestServer.DisposeAsync(); };
+        presentationClock.Tick += (_, _) => { history?.Tick(); presentation?.RefreshSharedState(); };
+        Closed += async (_, _) => { closing = true; scan.Stop(); presentationClock.Stop(); presentation?.Close(); if (!busy) projectLock?.Dispose(); if (remoteServer is not null) await remoteServer.DisposeAsync(); if (guestServer is not null) await guestServer.DisposeAsync(); };
     }
 
     private bool CanChangeProject()
@@ -124,6 +127,7 @@ public sealed partial class OperatorWindow : Window
         _ = StopGuestSharing();
         scan.Stop(); inputDirectory = null; observed.Clear(); presentation?.Close(); presentation = null;
         projectDirectory = dir; grid = nextGrid; history = nextHistory;
+        mosaicVisible = false; ResetPresentationClock();
         remoteImages.Clear();
         savedPhotos.Clear(); savedPhotos.AddRange((saved?.Photos ?? []).Select(PrintRecovery.AfterRestart));
         printerName = saved?.PrinterName; printEnabled = false; lastPrintError = null; UpdatePrintStatus();
@@ -143,13 +147,21 @@ public sealed partial class OperatorWindow : Window
         {
             if (presentation is null)
             {
-                var window = new PresentationWindow(Path.Combine(projectDirectory, "master"), grid, history);
+                var window = new PresentationWindow(Path.Combine(projectDirectory, "master"), grid, history, mosaicVisible);
                 window.Closed += (_, _) => presentation = null;
+                window.PlaybackChanged += ResetPresentationClock;
+                window.MosaicChanged += visible => mosaicVisible = visible;
                 presentation = window; window.Show();
             }
             else { presentation.Show(); presentation.Activate(); }
         }
         catch (Exception ex) { presentation = null; status.Text = $"Anzeige fehlgeschlagen: {ex.Message}"; }
+    }
+
+    private void ResetPresentationClock()
+    {
+        presentationClock.Stop();
+        if (history?.IsPlaying == true && !closing) presentationClock.Start();
     }
 
     private async Task SelectPhotos()
@@ -234,7 +246,7 @@ public sealed partial class OperatorWindow : Window
                         try { SaveProject(); }
                         catch { savedPhotos.RemoveAt(savedPhotos.Count - 1); throw; }
                         history.Add(new(id, tile, column, row));
-                        presentation?.NewArrival();
+                        ResetPresentationClock(); presentation?.NewArrival();
                         status.Text = $"Neues Bild: {grid.Coordinate(column, row)} · {history.Items.Count} von {grid.Columns * grid.Rows}";
                     }
                     finally { File.Delete(snapshot); }

@@ -5,7 +5,6 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using System.Windows.Threading;
 using Matrix.Core;
 using SkiaSharp;
 using MosaicGrid = Matrix.Core.Grid;
@@ -34,10 +33,11 @@ public sealed class PresentationWindow : Window
     private readonly TextBlock position = new() { FontSize = 18, Foreground = Brushes.LightGray };
     private readonly TextBlock remaining = new() { FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
     private readonly Button play;
-    private readonly DispatcherTimer slideshow = new() { Interval = TimeSpan.FromSeconds(8) };
+    public event Action? PlaybackChanged;
+    public event Action<bool>? MosaicChanged;
     private readonly Dictionary<string, Rectangle> occupied = [];
 
-    public PresentationWindow(string masterPath, MosaicGrid grid, PresentationHistory history)
+    public PresentationWindow(string masterPath, MosaicGrid grid, PresentationHistory history, bool mosaicVisible = false)
     {
         this.history = history;
         mosaicGrid = grid;
@@ -48,11 +48,11 @@ public sealed class PresentationWindow : Window
         Content = root;
         var controls = new WrapPanel { HorizontalAlignment = HorizontalAlignment.Center };
         DockPanel.SetDock(controls, Dock.Bottom); root.Children.Add(controls);
-        controls.Children.Add(ActionButton("← Zurück", () => { history.Previous(); Refresh(); }));
+        controls.Children.Add(ActionButton("← Zurück", () => { history.Previous(); ResetTimer(); Refresh(); }));
         play = ActionButton("Diashow starten", () => { history.ToggleSlideshow(); ResetTimer(); Refresh(); });
         controls.Children.Add(play);
-        controls.Children.Add(ActionButton("Weiter →", () => { history.Next(); Refresh(); }));
-        controls.Children.Add(ActionButton("Neuestes Bild", () => { history.Latest(); Refresh(); }));
+        controls.Children.Add(ActionButton("Weiter →", () => { history.Next(); ResetTimer(); Refresh(); }));
+        controls.Children.Add(ActionButton("Neuestes Bild", () => { history.Latest(); ResetTimer(); Refresh(); }));
         controls.Children.Add(ActionButton("Vollbild (F11)", ToggleFullscreen));
         previewButton = ActionButton("Fotomosaik anzeigen", ToggleMosaic);
         controls.Children.Add(previewButton); controls.Children.Add(previewStatus);
@@ -85,7 +85,6 @@ public sealed class PresentationWindow : Window
         var info = new StackPanel { Margin = new Thickness(0, 12, 0, 12) };
         info.Children.Add(remaining); info.Children.Add(coordinate); info.Children.Add(position);
         DockPanel.SetDock(info, Dock.Bottom); side.Children.Add(info); side.Children.Add(photo);
-        slideshow.Tick += (_, _) => { history.Tick(); Refresh(); };
         KeyDown += (_, e) =>
         {
             switch (e.Key)
@@ -98,15 +97,17 @@ public sealed class PresentationWindow : Window
                 case Key.Escape: WindowStyle = WindowStyle.SingleBorderWindow; WindowState = WindowState.Normal; break;
                 default: return;
             }
-            e.Handled = true; Refresh();
+            e.Handled = true; ResetTimer(); Refresh();
         };
-        Closed += (_, _) => { closed = true; slideshow.Stop(); };
-        ResetTimer(); Refresh();
+        Closed += (_, _) => closed = true;
+        if (mosaicVisible) ToggleMosaic();
+        Refresh();
     }
 
     private void ToggleMosaic()
     {
         showMosaic = !showMosaic;
+        MosaicChanged?.Invoke(showMosaic);
         mosaicLayer.Visibility = showMosaic ? Visibility.Visible : Visibility.Collapsed;
         previewButton.Content = showMosaic ? "Nur Motiv anzeigen" : "Fotomosaik anzeigen";
         previewFailed.Clear();
@@ -149,8 +150,7 @@ public sealed class PresentationWindow : Window
 
     public void NewArrival()
     {
-        // Give each new image a full slide interval, even if the previous timer was about to tick.
-        ResetTimer(); Refresh();
+        Refresh();
         if (showMosaic) _ = UpdateMosaicPreview();
     }
 
@@ -170,14 +170,15 @@ public sealed class PresentationWindow : Window
         ResetTimer(); Refresh(); return true;
     }
 
-    private void ResetTimer() { slideshow.Stop(); if (history.IsPlaying) slideshow.Start(); }
+    private void ResetTimer() => PlaybackChanged?.Invoke();
+
+    public void RefreshSharedState() => Refresh();
 
     private void Refresh()
     {
         int missing = GridPlanning.Remaining(mosaicGrid, history.Items.Count);
         remaining.Text = missing == 0 ? "Mosaik vollständig!" : $"{missing} {(missing == 1 ? "Bild fehlt" : "Bilder fehlen")} noch";
         play.Content = history.IsPlaying ? "Diashow pausieren" : "Diashow starten";
-        if (!history.IsPlaying) slideshow.Stop();
         foreach (var item in history.Items)
         {
             if (occupied.ContainsKey(item.Id)) continue;

@@ -10,9 +10,14 @@ public class RemoteServerTests
     private sealed class Controller : IRemoteController
     {
         public int Commands;
+        public string? RequestedProject;
         public Task<RemoteState> ReadState() => Task.FromResult(new RemoteState("project", 5, 5, 1.5, 25, 24,
             [new(new string('A', 64), "D03", 3, 2, "Pending")], new string('A', 64), false, false, true, false, "RX1", null));
-        public Task<byte[]?> ReadImage(string id, bool large = false, string? projectId = null) => Task.FromResult<byte[]?>(id == "master" ? [1, 2, 3] : null);
+        public Task<byte[]?> ReadImage(string id, bool large = false, string? projectId = null)
+        {
+            RequestedProject = projectId;
+            return Task.FromResult<byte[]?>(id == "master" && (projectId is null || projectId == "project") ? [1, 2, 3] : null);
+        }
         public Task<RemoteResult> Execute(RemoteCommand command)
         { Interlocked.Increment(ref Commands); return Task.FromResult(new RemoteResult(true, "Übernommen")); }
     }
@@ -60,6 +65,22 @@ public class RemoteServerTests
         Assert.Equal(1, controller.Commands);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.PostAsJsonAsync("/api/command", command with { RequestId = "" })).StatusCode);
         foreach (var response in responses) response.Dispose();
+    }
+
+    [Fact] public async Task PresentationPageUsesProtectedLiveDataAndChecksImageProject()
+    {
+        var controller = new Controller();
+        await using var server = new RemoteServer(controller, 0, loopbackOnly: true); await server.StartAsync();
+        using var client = new HttpClient { BaseAddress = new Uri(server.Address) };
+        string page = await client.GetStringAsync("/presentation");
+        Assert.Contains("Zweiten Bildschirm verbinden", page);
+        Assert.DoesNotContain(server.AccessCode, page);
+        Assert.DoesNotContain("/api/command", page); // Display page only reads state and images.
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/state")).StatusCode);
+        await Login(client, server.AccessCode);
+        Assert.Equal(HttpStatusCode.OK, (await client.GetAsync("/api/images/master?project=project")).StatusCode);
+        Assert.Equal("project", controller.RequestedProject);
+        Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/images/master?project=other-event")).StatusCode);
     }
 
     [Fact] public async Task LoginAttemptsAreLimitedAndRestartRevokesPreviousSession()
