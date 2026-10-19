@@ -36,32 +36,11 @@ public sealed partial class OperatorWindow : Window
 
     public OperatorWindow()
     {
-        Title = "Matrix – Steuerung"; Width = 650; Height = 820; MinWidth = 550; MinHeight = 450;
-        var panel = new StackPanel { Margin = new Thickness(24) };
-        Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-        panel.Children.Add(new TextBlock { Text = "Matrix · Fotomosaik", FontSize = 28, Margin = new Thickness(0, 0, 0, 20) });
-        panel.Children.Add(PresentationWindow.ActionButton("Neues Projekt: zuerst Logo auswählen …", CreateProject));
-        panel.Children.Add(PresentationWindow.ActionButton("Gespeichertes Projekt öffnen …", OpenProject));
-        panel.Children.Add(PresentationWindow.ActionButton("Präsentationsfenster öffnen", ShowPresentation));
-        panel.Children.Add(PresentationWindow.ActionButton("Einladungstext und Wartezeit einstellen …", ConfigureInvitation));
-        var import = PresentationWindow.ActionButton("Fotos hinzufügen …", () => _ = SelectPhotos()); panel.Children.Add(import);
-        panel.Children.Add(PresentationWindow.ActionButton("Eingangsordner überwachen …", WatchFolder));
-        panel.Children.Add(PresentationWindow.ActionButton("Überwachung stoppen", () =>
-        { scan.Stop(); observed.Clear(); status.Text = "Ordnerüberwachung pausiert."; }));
-        panel.Children.Add(new TextBlock
-        {
-            Text = "Präsentationsfenster auf den zweiten Bildschirm ziehen; F11 für Vollbild.\n← / → blättern · Leertaste Diashow · Ende neuestes Bild · Esc Fenster",
-            TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 12, 0, 16)
-        });
-        panel.Children.Add(PresentationWindow.ActionButton("Zusatzdruck einrichten / starten …", ConfigurePrinting));
-        panel.Children.Add(PresentationWindow.ActionButton("Zusatzdruck pausieren", () => { printEnabled = false; UpdatePrintStatus(); }));
-        panel.Children.Add(PresentationWindow.ActionButton("Ausgewähltes Bild drucken / nachdrucken", QueueSelectedPhoto));
-        panel.Children.Add(printStatus);
-        panel.Children.Add(PresentationWindow.ActionButton("Restfelder abschließen (mit / ohne Fotos) …", async () => await CompleteRemaining()));
-        panel.Children.Add(PresentationWindow.ActionButton("Laufenden Abschluss abbrechen", () => completionCancel?.Cancel()));
-        panel.Children.Add(projectLabel); panel.Children.Add(status);
-        AddRemoteControls(panel);
-        AddPreviewSharing(panel);
+        Title = "Matrix · Fotobox Studio"; Width = 1160; Height = 850; MinWidth = 800; MinHeight = 600;
+        Content = BuildStudioLayout();
+        var dashboardClock = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        dashboardClock.Tick += (_, _) => RefreshDashboard(); dashboardClock.Start();
+        Closed += (_, _) => dashboardClock.Stop();
         scan.Tick += async (_, _) => await ScanFolder();
         invitationClock.Tick += (_, _) => UpdateInvitation(); invitationClock.Start();
         presentationClock.Tick += (_, _) => { history?.Tick(); presentation?.RefreshSharedState(); };

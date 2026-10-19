@@ -8,6 +8,7 @@ public static class Program
     public static void Main()
     {
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
+        StudioTheme.Apply(app);
         app.Run(new OperatorWindow());
     }
 }

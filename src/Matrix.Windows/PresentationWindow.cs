@@ -228,7 +228,7 @@ public sealed class PresentationWindow : Window
 
     internal static Button ActionButton(string title, Action action)
     {
-        var button = new Button { Content = title, Margin = new Thickness(4), Padding = new Thickness(12, 8, 12, 8) };
+        var button = new Button { Content = new TextBlock { Text = title, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center }, Margin = new Thickness(4), Padding = new Thickness(12, 8, 12, 8) };
         button.Click += (_, _) => action(); return button;
     }
 

@@ -504,3 +504,16 @@ Motivausschnitte prüfen, Projekt schließen/öffnen und ohne erneute Konvertier
 weiterarbeiten. Eigene Einladungs-/Abschlusstexte und kurze Wartezeit einstellen;
 Windows- und Browseranzeige vergleichen, neues Foto importieren: Einladung
 verschwindet. Nach Ablauf erneut sichtbar; vollständig belegt zeigt Abschlusstext.
+
+### Oberfläche im Fotobox-Stil
+
+Die Windows-Steuerung nutzt eine dunkle Oberfläche mit türkisfarbenen Akzenten
+und großen Schaltflächen. Die Bereiche **Veranstaltung**, **Druck & Abschluss**,
+**Anzeige** und **Browser & QR-Code** trennen den laufenden Betrieb von der
+Einrichtung. Die Veranstaltungsseite zeigt das ausgewählte Foto (vor dem ersten
+Foto das Motiv), belegte und verbleibende Felder sowie Import- und Druckstatus.
+Die Vorschau folgt derselben Fotoauswahl wie die Präsentation.
+
+Das Layout ist an typische Fotobox-Oberflächen angelehnt. Matrix bleibt eine
+eigenständige Anwendung neben DSLRBooth / LumaBooth. Eine Cloud-Projektverwaltung
+oder ein automatischer Cloud-Upload ist nicht enthalten.
