@@ -53,3 +53,12 @@ Die Browseranzeige zeigt dann den letzten geladenen Stand mit Verbindungswarnung
 Ein ausgeschalteter Fotobox-PC kann keine Live-Vorschau oder Fernsteuerung liefern.
 
 Die genaue WLAN-, Tailscale- und Funnel-Einrichtung steht in [README](../README.md).
+
+### Installierbare Handy-App
+
+Auf Android und iPhone kann die Browser-Steuerung als Matrix-App zum
+Startbildschirm hinzugefügt werden. Voraussetzung: private **HTTPS-Adresse**
+(z. B. Tailscale Serve), laufende Browser-Steuerung und Zugangscode. Sie bietet
+alle Funktionen der Browser-Steuerung. Android: im Browser „App installieren“;
+iPhone: in Safari „Teilen → Zum Home-Bildschirm“. Im Offline-Modus zeigt sie eine
+Verbindungshilfe; Steuerung und Druck benötigen eine Verbindung zur Fotobox.

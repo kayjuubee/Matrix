@@ -539,3 +539,33 @@ beschreibbar sein. Die Anwendung darf nicht getrimmt werden (WPF). Die
 GitHub-Aktion testet zuerst Linux und Windows und erstellt danach das ZIP unter
 „Releases → Matrix für Windows“. Ein echter Windows-Start und ein RX1-Probedruck
 bleiben als Geräteprüfung erforderlich.
+
+### Smartphone-App installieren (Android / iPhone)
+
+Die Browser-Steuerung lässt sich als **PWA** mit eigenem Matrix-Symbol und ohne
+Browserleiste installieren. Es ist kein App-Store und kein Cloud-Upload nötig.
+
+1. Am Fotobox-Rechner unter **Browser & QR-Code** die Browser-Steuerung starten.
+2. Eine private HTTPS-Adresse einrichten, beispielsweise mit dem oben beschriebenen
+   Tailscale Serve auf Port 8787. Handy und Fotobox müssen über Tailscale erreichbar
+   sein. Dieselbe HTTPS-Adresse kann auch im WLAN verwendet werden.
+3. Diese Adresse auf dem Handy öffnen. **Android (Chrome / Edge):** „Matrix
+   installieren“ oder im Browser-Menü „App installieren“ wählen. **iPhone
+   (Safari):** Teilen → Zum Home-Bildschirm → als Web-App hinzufügen.
+4. Matrix über das neue Symbol öffnen und den am Fotobox-Rechner angezeigten
+   Zugangscode eingeben. Die Installation übernimmt die Anmeldung aus dem Browser
+   nicht auf jedem Gerät; bei Bedarf erneut anmelden.
+
+Die App bietet dieselben Funktionen wie die Browser-Steuerung, einschließlich
+Mosaik, Fotoauswahl, Diashow sowie Import- und Drucksteuerung. Nach einem Neustart
+der Browser-Steuerung ist der neue Zugangscode erforderlich. Ohne HTTPS bleibt die
+normale Steuerung über die WLAN-HTTP-Adresse möglich; die App-Installation wird
+auf dem Smartphone dort nicht unterstützt.
+
+Bei Verbindungsverlust werden die Steuerschaltflächen deaktiviert. Nach der
+Rückkehr wird der aktuelle Zustand geladen. Beim Offline-Start erscheint eine
+Verbindungshilfe. Fotos, Zugangsdaten und API-Antworten werden vom Service Worker
+nicht im Offline-Cache gespeichert; Druckaufträge werden nicht offline gesammelt
+oder später automatisch wiederholt. Die App benötigt den laufenden Fotobox-Rechner.
+Die öffentliche QR-Gästevorschau bleibt eine getrennte Freigabe; zum Installieren
+der Steuerungs-App wird die private Steuerungsadresse verwendet.

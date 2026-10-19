@@ -7,6 +7,7 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <EmbeddedResource Include="control.html" />
+    <EmbeddedResource Include="pwa/*" />
     <EmbeddedResource Include="preview.html" />
     <EmbeddedResource Include="presentation.html" />
     <PackageReference Include="QRCoder" Version="1.8.1" />

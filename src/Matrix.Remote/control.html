@@ -1,9 +1,17 @@
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#11151d">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Matrix">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>Matrix Fernsteuerung</title><style>
 :root{color-scheme:dark;font-family:system-ui,sans-serif;background:#0f172a;color:#f8fafc}*{box-sizing:border-box}body{max-width:1200px;margin:auto;padding:20px}h1{margin:0 0 12px;font-size:28px}button,input{font:inherit;border-radius:9px;padding:12px;border:1px solid #64748b}button{background:#334155;color:white;cursor:pointer;min-height:46px}button:hover{background:#475569}button:disabled{opacity:.45;cursor:wait}input{background:#1e293b;color:white;max-width:100%}.card{background:#1e293b;padding:18px;border-radius:14px;margin:14px 0}.actions{display:flex;gap:8px;flex-wrap:wrap}.main{display:grid;grid-template-columns:3fr 2fr;gap:20px}.main img{width:100%;max-height:45vh;object-fit:contain}canvas{width:100%;height:auto;cursor:pointer}#coordinate{font-size:52px;font-weight:700}#remaining{font-size:26px;font-weight:650}#message{min-height:26px;color:#fbbf24}small{color:#cbd5e1}.danger{background:#7c2d12}[hidden]{display:none!important}@media(max-width:700px){body{padding:12px}.main{grid-template-columns:1fr}.main img{max-height:32vh}}
 </style></head><body>
 <h1>Matrix Fernsteuerung</h1><small id="connection">Bitte verbinden</small>
+<section class="card" id="appInstall"><strong>Matrix auf dem Handy</strong>
+<p id="installHelp">Wird vorbereitet …</p><button id="installApp" hidden>Matrix installieren</button></section>
 <form id="login" class="card"><label>Zugangscode vom Fotobox-Rechner<br><input id="code" autocomplete="off" autocapitalize="characters" spellcheck="false" required maxlength="30"></label> <button>Verbinden</button></form>
 <p id="message" role="status"></p>
 <main id="control" hidden>
@@ -18,13 +26,14 @@
 <div class="card"><p id="monitor"></p><div class="actions"><button data-action="monitor-pause">Import pausieren</button><button data-action="monitor-resume">Import fortsetzen</button><button id="logout">Abmelden</button></div></div>
 </main><script>
 const $=id=>document.getElementById(id);
-let token=sessionStorage.getItem('matrixToken')||'', state=null, project=null, epoch=0, acting=false, refreshing=false;
+let token=sessionStorage.getItem('matrixToken')||'', state=null, project=null, epoch=0, acting=false, refreshing=false, connected=false;
 let images=new Map(), failed=new Set(), imageLoading=false, master=null, currentUrl=null, currentPhoto=null, loadingPhoto=null;
 const statusNames={NotRequested:'Kein Druck angefordert',Pending:'Wartet auf Zusatzdruck',Submitting:'Übergabe an Windows',Submitted:'An Windows übergeben',NeedsReview:'Druck manuell prüfen'};
+function connectionReady(ready){connected=ready;document.querySelectorAll('[data-action]').forEach(b=>b.disabled=acting||!ready)}
 function message(text){$('message').textContent=text}
 async function api(path,options={}){
  const r=await fetch(path,{...options,cache:'no-store',signal:AbortSignal.timeout(12000),headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json',...options.headers}});
- if(r.status===401){token='';sessionStorage.removeItem('matrixToken');$('login').hidden=false;$('control').hidden=true;throw Error('Bitte Zugangscode erneut eingeben.');}
+ if(r.status===401){connectionReady(false);token='';sessionStorage.removeItem('matrixToken');$('login').hidden=false;$('control').hidden=true;throw Error('Bitte Zugangscode erneut eingeben.');}
  if(!r.ok)throw Error(r.status===429?'Zu viele Versuche. Bitte eine Minute warten.':'Anfrage fehlgeschlagen ('+r.status+').');
  return r;
 }
@@ -33,7 +42,7 @@ $('login').onsubmit=async e=>{e.preventDefault();try{
  if(!r.ok)throw Error(r.status===429?'Bitte eine Minute warten.':'Zugangscode stimmt nicht.');
  token=(await r.json()).token;sessionStorage.setItem('matrixToken',token);$('code').value='';message('');await refresh();
 }catch(err){message(err.message)}};
-$('logout').onclick=()=>{token='';sessionStorage.removeItem('matrixToken');clearImages();$('control').hidden=true;$('login').hidden=false;$('connection').textContent='Abgemeldet';};
+$('logout').onclick=()=>{connectionReady(false);token='';sessionStorage.removeItem('matrixToken');clearImages();$('control').hidden=true;$('login').hidden=false;$('connection').textContent='Abgemeldet';};
 function clearImages(){epoch++;for(const x of images.values())URL.revokeObjectURL(x.url);images.clear();failed.clear();if(master)URL.revokeObjectURL(master.url);master=null;if(currentUrl)URL.revokeObjectURL(currentUrl);currentUrl=null;currentPhoto=null;loadingPhoto=null;$('photo').removeAttribute('src');}
 async function loadImage(id){const r=await api('/api/images/'+id);const blob=await r.blob(),url=URL.createObjectURL(blob),image=new Image();try{await new Promise((ok,no)=>{image.onload=ok;image.onerror=no;image.src=url});return {image,url}}catch(e){URL.revokeObjectURL(url);throw e}}
 function draw(){
@@ -54,17 +63,20 @@ async function fillImages(){if(imageLoading||!state?.projectId)return;imageLoadi
 function renderSelection(){const p=state?.photos.find(p=>p.id===state.currentId);$('coordinate').textContent=p?.coordinate||'Bereit';$('photoState').textContent=p?(statusNames[p.printState]||p.printState):'Warte auf das erste Foto';const image=p&&images.get(p.id);if(p&&currentPhoto===p.id&&currentUrl)$('photo').src=currentUrl;else if(image)$('photo').src=image.url;else $('photo').removeAttribute('src')}
 async function loadCurrentPhoto(){const id=state?.currentId;if(!id||currentPhoto===id||loadingPhoto===id)return;loadingPhoto=id;const version=epoch;try{const img=await loadImage(id+'?large=true');if(version!==epoch||state?.currentId!==id){URL.revokeObjectURL(img.url);return}if(currentUrl)URL.revokeObjectURL(currentUrl);currentUrl=img.url;currentPhoto=id;renderSelection()}catch(e){}finally{if(loadingPhoto===id)loadingPhoto=null}}
 async function refresh(){if(!token||refreshing)return;refreshing=true;try{
- const r=await api('/api/state');state=await r.json();$('connection').textContent='Verbunden · '+new Date().toLocaleTimeString('de-DE');$('login').hidden=true;$('control').hidden=false;
+ const r=await api('/api/state');state=await r.json();connectionReady(true);$('connection').textContent='Verbunden · '+new Date().toLocaleTimeString('de-DE');$('login').hidden=true;$('control').hidden=false;
  if(project!==state.projectId){project=state.projectId;clearImages()}
  $('remaining').textContent=state.projectId?(state.remaining===0?'Mosaik vollständig!':state.remaining+' Bilder fehlen noch'):'Bitte am Fotobox-Rechner ein Projekt öffnen';
  $('progress').textContent=state.photos.length+' von '+state.total+' Bildern';$('slideshow').textContent=state.slideshow?'Diashow pausieren':'Diashow starten';$('mosaic').textContent=state.mosaicVisible?'Am Bildschirm nur Motiv zeigen':'Am Bildschirm Fotomosaik zeigen';
  $('printer').textContent='Zusatzdruck '+(state.printing?'aktiv':'pausiert')+' · '+(state.printer||'Drucker am PC einrichten')+(state.error?' · '+state.error:'');$('monitor').textContent='Ordnerüberwachung '+(state.monitoring?'aktiv':'pausiert');
  renderSelection();draw();void fillImages();void loadCurrentPhoto();
-}catch(err){$('connection').textContent='Verbindung unterbrochen · lokale Verarbeitung läuft weiter';message(err.message)}finally{refreshing=false;}}
-async function command(action,imageId){if(acting||!state?.projectId)return;const photo=state.photos.find(p=>p.id===(imageId||state.currentId));if(action==='print'&&(!photo||!confirm('Zusätzlichen Ausdruck für '+photo.coordinate+' anfordern? Bereits gedruckte Fotos werden nochmals gedruckt.')))return;
+}catch(err){connectionReady(false);$('connection').textContent='Verbindung unterbrochen · lokale Verarbeitung läuft weiter';message(err.message)}finally{refreshing=false;}}
+async function command(action,imageId){if(acting||!connected||!state?.projectId)return;const photo=state.photos.find(p=>p.id===(imageId||state.currentId));if(action==='print'&&(!photo||!confirm('Zusätzlichen Ausdruck für '+photo.coordinate+' anfordern? Bereits gedruckte Fotos werden nochmals gedruckt.')))return;
  acting=true;document.querySelectorAll('[data-action]').forEach(b=>b.disabled=true);const requestId=Array.from(crypto.getRandomValues(new Uint32Array(4))).map(n=>n.toString(16)).join('-');
- try{const r=await api('/api/command',{method:'POST',body:JSON.stringify({action,projectId:state.projectId,requestId,imageId:imageId||photo?.id,confirmReprint:action==='print'})});const result=await r.json();message(result.message);await refresh()}catch(err){message(err.message+' Bei einem Druckauftrag zuerst Status prüfen, bevor du erneut druckst.')}finally{acting=false;document.querySelectorAll('[data-action]').forEach(b=>b.disabled=false)}}
+ try{const r=await api('/api/command',{method:'POST',body:JSON.stringify({action,projectId:state.projectId,requestId,imageId:imageId||photo?.id,confirmReprint:action==='print'})});const result=await r.json();message(result.message);await refresh()}catch(err){message(err.message+' Bei einem Druckauftrag zuerst Status prüfen, bevor du erneut druckst.')}finally{acting=false;connectionReady(connected)}}
 document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>command(b.dataset.action));
 $('wall').onclick=e=>{if(!state?.projectId)return;const c=$('wall'),rect=c.getBoundingClientRect(),col=Math.floor((e.clientX-rect.left)/rect.width*state.columns),row=Math.floor((e.clientY-rect.top)/rect.height*state.rows);const photo=state.photos.find(p=>p.column===col&&p.row===row);if(photo)command('select',photo.id)};
+window.addEventListener('offline',()=>{connectionReady(false);$('connection').textContent='Keine Verbindung · Steuerung pausiert';});
+window.addEventListener('online',()=>void refresh());
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh()});
 async function poll(){await refresh();setTimeout(poll,2000)}poll();
-</script></body></html>
+</script><script src="/pwa.js" defer></script></body></html>

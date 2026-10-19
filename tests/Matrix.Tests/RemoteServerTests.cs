@@ -52,6 +52,31 @@ public class RemoteServerTests
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync("/api/images/not-a-photo")).StatusCode);
     }
 
+    [Fact] public async Task InstallableAppAssetsArePublicButLiveDataStillRequiresLogin()
+    {
+        await using var server = new RemoteServer(new Controller(), 0, loopbackOnly: true); await server.StartAsync();
+        using var client = new HttpClient { BaseAddress = new Uri(server.Address) };
+        using var manifest = await client.GetAsync("/manifest.webmanifest"); manifest.EnsureSuccessStatusCode();
+        Assert.Equal("application/manifest+json", manifest.Content.Headers.ContentType!.MediaType);
+        var json = await manifest.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("standalone", json.GetProperty("display").GetString());
+        Assert.Equal("/", json.GetProperty("start_url").GetString());
+        foreach (var icon in json.GetProperty("icons").EnumerateArray())
+        {
+            using var image = await client.GetAsync(icon.GetProperty("src").GetString()); image.EnsureSuccessStatusCode();
+            Assert.Equal("image/png", image.Content.Headers.ContentType!.MediaType);
+            var bytes = await image.Content.ReadAsByteArrayAsync();
+            Assert.Equal(new byte[] { 137, 80, 78, 71 }, bytes.Take(4));
+        }
+        using var worker = await client.GetAsync("/sw.js"); worker.EnsureSuccessStatusCode();
+        Assert.Equal("text/javascript", worker.Content.Headers.ContentType!.MediaType);
+        Assert.True(worker.Headers.CacheControl!.NoStore);
+        Assert.Contains("Fotobox nicht erreichbar", await client.GetStringAsync("/offline.html"));
+        Assert.Contains("beforeinstallprompt", await client.GetStringAsync("/pwa.js"));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.GetAsync("/api/state")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await client.PostAsJsonAsync("/api/command", new RemoteCommand("print", "project", "offline"))).StatusCode);
+    }
+
     [Fact] public async Task RepeatedOrConcurrentPhoneRequestsExecutePrintOnlyOnce()
     {
         var controller = new Controller();

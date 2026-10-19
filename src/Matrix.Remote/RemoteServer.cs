@@ -53,6 +53,15 @@ public sealed class RemoteServer : IAsyncDisposable
         });
         app.UseRateLimiter();
         app.MapGet("/", () => Results.Text(ReadPage(), "text/html; charset=utf-8"));
+        foreach (var (name, type) in new[] {
+            ("manifest.webmanifest", "application/manifest+json"), ("sw.js", "text/javascript"),
+            ("pwa.js", "text/javascript"), ("offline.html", "text/html; charset=utf-8"),
+            ("icon-192.png", "image/png"), ("icon-512.png", "image/png") })
+        {
+            var resource = name; var contentType = type;
+            app.MapGet("/" + resource, () => Results.Stream(
+                typeof(RemoteServer).Assembly.GetManifestResourceStream("Matrix.Remote.pwa." + resource)!, contentType));
+        }
         app.MapGet("/presentation", () => Results.Text(ReadPage("presentation"), "text/html; charset=utf-8"));
         app.MapPost("/login", (LoginRequest request) => SecureEquals(request.Code?.Trim().ToUpperInvariant() ?? "", AccessCode)
             ? Results.Ok(new { token }) : Results.Unauthorized()).RequireRateLimiting("login");
