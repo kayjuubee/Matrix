@@ -9,7 +9,7 @@ namespace Matrix.Windows;
 internal sealed class GridSetupWindow : Window
 {
     private readonly string logoPath;
-    private readonly (int Width, int Height) logoSize;
+    private readonly (double Width, double Height, bool IsVector) logoSize;
     private readonly TextBox target = new() { Text = "300", Width = 90 };
     private readonly TextBox columns = new() { Width = 70 };
     private readonly TextBox rows = new() { Width = 70 };
@@ -23,13 +23,13 @@ internal sealed class GridSetupWindow : Window
     public GridSetupWindow(string logoPath)
     {
         this.logoPath = logoPath;
-        logoSize = Mosaic.ReadOrientedSize(logoPath);
+        logoSize = Mosaic.ReadLogoInfo(logoPath);
         Title = "Logo gewählt – Raster planen"; Width = 600; Height = 660;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var panel = new StackPanel { Margin = new Thickness(24) };
         Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         panel.Children.Add(new TextBlock { Text = "Passendes Raster für dein Logo", FontSize = 24, Margin = new Thickness(0, 0, 0, 16) });
-        panel.Children.Add(new TextBlock { Text = $"Logo: {logoSize.Width} × {logoSize.Height} Pixel" });
+        panel.Children.Add(new TextBlock { Text = $"Logo: {logoSize.Width:0.###} × {logoSize.Height:0.###} {(logoSize.IsVector ? "SVG-Zeicheneinheiten · skalierbar" : "Pixel")}" });
         panel.Children.Add(new TextBlock { Text = "Ungefähre gewünschte Bildanzahl", Margin = new Thickness(0, 12, 0, 4) });
         panel.Children.Add(target);
         panel.Children.Add(new TextBlock { Text = "Papierausrichtung", Margin = new Thickness(0, 12, 0, 4) });

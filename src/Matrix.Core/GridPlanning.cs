@@ -4,10 +4,10 @@ namespace Matrix.Core;
 
 public static class GridPlanning
 {
-    public static Grid Suggest(int logoWidth, int logoHeight, int targetCount = 300,
+    public static Grid Suggest(double logoWidth, double logoHeight, int targetCount = 300,
         PhotoFormat format = PhotoFormat.Landscape10x15)
     {
-        if (logoWidth <= 0 || logoHeight <= 0 || targetCount is < 1 or > 10000)
+        if (!double.IsFinite(logoWidth) || !double.IsFinite(logoHeight) || logoWidth <= 0 || logoHeight <= 0 || targetCount is < 1 or > 10000)
             throw new ArgumentOutOfRangeException(nameof(targetCount));
         double logoAspect = (double)logoWidth / logoHeight;
         Grid? best = null;

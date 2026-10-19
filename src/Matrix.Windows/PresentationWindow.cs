@@ -32,6 +32,9 @@ public sealed class PresentationWindow : Window
     private readonly TextBlock coordinate = new() { FontSize = 64, FontWeight = FontWeights.Bold, Foreground = Brushes.White };
     private readonly TextBlock position = new() { FontSize = 18, Foreground = Brushes.LightGray };
     private readonly TextBlock remaining = new() { FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 8) };
+    private readonly TextBlock invitationText = new() { FontSize = 32, Foreground = Brushes.White, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center };
+    private readonly TextBlock invitationRemaining = new() { FontSize = 24, Foreground = Brushes.White, TextAlignment = TextAlignment.Center, Margin = new Thickness(0, 12, 0, 0) };
+    private readonly Border invitationOverlay;
     private readonly Button play;
     public event Action? PlaybackChanged;
     public event Action<bool>? MosaicChanged;
@@ -70,6 +73,14 @@ public sealed class PresentationWindow : Window
         wall.Children.Add(mosaicLayer);
         var viewbox = new Viewbox { Child = wall, Stretch = Stretch.Uniform, Margin = new Thickness(12) };
         layout.Children.Add(viewbox);
+        var invitationContent = new StackPanel(); invitationContent.Children.Add(invitationText); invitationContent.Children.Add(invitationRemaining);
+        invitationOverlay = new Border
+        {
+            Child = invitationContent, Background = new SolidColorBrush(Color.FromArgb(220, 15, 23, 42)), CornerRadius = new CornerRadius(16),
+            Padding = new Thickness(24), Margin = new Thickness(24), VerticalAlignment = VerticalAlignment.Center,
+            IsHitTestVisible = false, Visibility = Visibility.Collapsed
+        };
+        layout.Children.Add(invitationOverlay);
         for (int c = 0; c <= grid.Columns; c++)
             wall.Children.Add(new Line { X1 = c * cellWidth, X2 = c * cellWidth, Y1 = 0, Y2 = height, Stroke = Brushes.Black, Opacity = 0.45, StrokeThickness = 1 });
         for (int r = 0; r <= grid.Rows; r++)
@@ -173,6 +184,13 @@ public sealed class PresentationWindow : Window
     private void ResetTimer() => PlaybackChanged?.Invoke();
 
     public void RefreshSharedState() => Refresh();
+
+    public void SetInvitation(string? message, int missing)
+    {
+        invitationOverlay.Visibility = message is null ? Visibility.Collapsed : Visibility.Visible;
+        invitationText.Text = message ?? "";
+        invitationRemaining.Text = missing == 0 ? "Alle Felder sind belegt." : $"{missing} {(missing == 1 ? "Bild fehlt" : "Bilder fehlen")} noch.";
+    }
 
     private void Refresh()
     {

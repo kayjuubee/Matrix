@@ -6,7 +6,7 @@ public sealed record SavedPhoto(string Id, int Column, int Row, PrintState Print
 
 // Projects saved before format support used square tiles. Never silently reinterpret their layout.
 public sealed record SavedProject(int Columns, int Rows, List<SavedPhoto> Photos,
-    PhotoFormat Format = PhotoFormat.Square, string? PrinterName = null);
+    PhotoFormat Format = PhotoFormat.Square, string? PrinterName = null, InvitationSettings? Invitation = null);
 
 public static class PrintRecovery
 {

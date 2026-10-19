@@ -232,6 +232,59 @@ externen QR-Dienst zu senden. Die Internetverbindung läuft bei Funnel über des
 Infrastruktur. Bereits von Gästen angesehene/gespeicherte Bilder lassen sich durch
 Sperren des Links nicht von deren Geräten zurückholen.
 
+## SVG-Logos und scharfe Motivausschnitte
+
+Bei der Logoauswahl werden jetzt **SVG, PNG, JPG/JPEG, WebP und BMP** unterstützt.
+SVG-Dateien bleiben als Original im Projekt erhalten. Rastervorschlag und Vorschau
+verwenden deren Zeichenfläche, einschließlich viewBox und Seitenverhältnis. SVG
+wird anhand des Inhalts erkannt, auch im gespeicherten Projekt unter dem Namen
+`master` ohne Dateiendung.
+
+Für jede Druckkachel werden die Vektorzeichen direkt auf die Zielauflösung gezeichnet.
+Es entsteht kein kleines Zwischen-PNG des gesamten Logos, das später vergrößert
+wird. Die Vorschau wird separat in ihrer Bildschirmauflösung gerendert. Das gilt
+auch für Browser-/Gästevorschau und den Abschluss ohne Fotos. Die fertigen
+Fotokacheln bleiben druckbare 1800 × 1200- beziehungsweise 1200 × 1800-PNGs.
+
+Empfehlung: Pfade, Formen und Verläufe verwenden und Schriften möglichst in Pfade
+umwandeln. Text mit installierten Schriften ist abhängig von den Schriften auf dem
+Fotobox-PC. Eingebettete Rasterbilder werden unterstützt, erhalten durch die SVG
+aber keine zusätzliche Auflösung. Interne Verweise (`#...`) und eingebettete
+Datenbilder sind möglich; externe Bilder, CSS-Dateien und verlinkte Ressourcen
+müssen vor dem Import in die Datei eingebettet werden. JavaScript wird nicht
+aktiviert. PDF, EPS und SVGZ sind keine freigegebenen Importformate.
+Die SVG-Renderbibliothek Svg.Skia wird unter MIT-Lizenz verwendet.
+
+Ein vorhandenes PNG-Projekt wird durch das Update nicht automatisch zum Vektorprojekt.
+Dafür ein neues Projekt mit dem SVG-Original anlegen; bestehende Kacheln bleiben
+unverändert.
+
+## Mitmach-Einblendung auf dem zweiten Bildschirm
+
+Über **„Einladungstext und Wartezeit einstellen“** im Windows-Programm lassen sich
+pro Projekt speichern:
+
+- Einblendung aktivieren/deaktivieren;
+- Wartezeit seit dem letzten neuen Foto: **5–3600 Sekunden**, Standard **20**;
+- eigener Einladungstext und eigener Text bei vollständigem Mosaik, jeweils bis
+  500 Zeichen und mit Zeilenumbrüchen.
+
+Platzhalter: **`{rest}`** für fehlende Kacheln und **`{gesamt}`** für die Gesamtzahl.
+Beispiel: „Mach auch du ein Foto! Noch {rest} Bilder bis zu unserem Firmenlogo.“
+
+Nach der Wartezeit erscheint die Einladung halbtransparent über dem Motiv/Mosaik;
+Foto und Koordinate daneben bleiben sichtbar. Eine laufende Diashow kann während
+der Einblendung weiterlaufen. Ein tatsächlich neu importiertes Foto setzt die
+Wartezeit zurück und blendet die Einladung aus. Das Blättern durch alte Fotos
+setzt den Fotozeitpunkt nicht zurück. Ist die Matrix vollständig, erscheint nach
+derselben Wartezeit stattdessen der eigene Abschlusstext.
+
+Die Windows- und private Browser-Präsentation verwenden denselben aktuellen
+Einblendungszustand. Der Browser übernimmt Änderungen beim nächsten Abruf (ca.
+eine Sekunde). Einstellungen bleiben beim Projektneustart erhalten; die Wartezeit
+beginnt beim Öffnen neu. Während des Restfeld-Abschlusses wird keine Einladung
+angezeigt. Die öffentliche Gästevorschau ist weiterhin eine separate Ansicht.
+
 ## Import und Speicherung
 
 Projekte werden unter `%LOCALAPPDATA%\Matrix\Projects\<Kennung>` abgelegt. Der
@@ -445,3 +498,9 @@ Rechner öffnen und anmelden. Vom Handy Bilder wechseln und Diashow starten;
 Foto, Koordinate, Markierung und Restzahl müssen folgen. Natives Fenster schließen:
 Browser-Diashow läuft weiter. Ein neues Bild muss für ein volles Diaintervall
 zentral ausgewählt bleiben. Projektwechsel und Verbindungsunterbrechung prüfen.
+
+Zusätzliche Abnahme SVG/Einblendung: SVG-Logo auswählen, Rastervorschlag und
+Motivausschnitte prüfen, Projekt schließen/öffnen und ohne erneute Konvertierung
+weiterarbeiten. Eigene Einladungs-/Abschlusstexte und kurze Wartezeit einstellen;
+Windows- und Browseranzeige vergleichen, neues Foto importieren: Einladung
+verschwindet. Nach Ablauf erneut sichtbar; vollständig belegt zeigt Abschlusstext.

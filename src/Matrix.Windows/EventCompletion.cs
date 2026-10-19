@@ -49,7 +49,7 @@ public sealed partial class OperatorWindow
                     try { SaveProject(); }
                     catch { savedPhotos.RemoveAt(savedPhotos.Count - 1); throw; }
                     history.Add(new(id, tile, cell.Column, cell.Row));
-                    generated++; ResetPresentationClock(); presentation?.NewArrival(); UpdatePrintStatus();
+                    generated++; PhotoArrived(); ResetPresentationClock(); presentation?.NewArrival(); UpdatePrintStatus();
                     status.Text = $"Abschluss: {generated} von {plan.Count} Restfeldern erzeugt. Zusatzdruck pausiert.";
                 }
                 finally { if (File.Exists(tile + ".tmp")) File.Delete(tile + ".tmp"); }

@@ -6,7 +6,7 @@ zusätzlich Tailscale nötig; für Gäste mit öffentlichem Vorschau-Link nicht.
 
 | Gerät / Rolle | Möglichkeiten | Einrichtung |
 | --- | --- | --- |
-| Fotobox-PC, Windows-Steuerung | Logo/Raster, Projekte, Fotoordner und Drucker einrichten; Fotos importieren und Zusatzdrucke verarbeiten; Restfelder mit/ohne Fotos abschließen; Browserzugänge und Gäste-QR erstellen | Matrix starten, Fotobox und RX1 einrichten |
+| Fotobox-PC, Windows-Steuerung | Logo/Raster (auch SVG), Projekte, Fotoordner, Drucker und Einladungstexte/Wartezeit einrichten; Fotos importieren und Zusatzdrucke verarbeiten; Restfelder mit/ohne Fotos abschließen; Browserzugänge und Gäste-QR erstellen | Matrix starten, Fotobox und RX1 einrichten |
 | Fotobox-PC, Browser | Laufenden Betrieb steuern oder Browser-Präsentation anzeigen | Browser-Steuerung starten, lokale Seite öffnen, mit Zugangscode verbinden |
 | Zweiter PC / Notebook, Browser-Steuerung | Mosaik/Status ansehen, Fotos auswählen, Diashow steuern, Import und Zusatzdruck pausieren/fortsetzen, konkrete Fotos nachdrucken | Im selben WLAN/LAN die angezeigte Adresse öffnen; von außerhalb über private Tailscale-Verbindung; Zugangscode nötig |
 | Handy / Tablet als Bediengerät | Dieselben Betriebsfunktionen wie die Browser-Steuerung am zweiten PC | Browser und Zugangscode; im WLAN direkt, unterwegs über Tailscale |
@@ -15,7 +15,7 @@ zusätzlich Tailscale nötig; für Gäste mit öffentlichem Vorschau-Link nicht.
 
 ## Was bleibt am Fotobox-PC?
 
-Projektanlage, Logo- und Rasterplanung, Auswahl lokaler Dateien/Ordner, Einrichtung
+Projektanlage, Logo- und Rasterplanung, Einladungstexte/Wartezeit, Auswahl lokaler Dateien/Ordner, Einrichtung
 des Druckertreibers, Veranstaltungsabschluss und Erstellung der QR-Freigabe werden
 in der Windows-Steuerung erledigt. Der Browser steuert danach den laufenden Betrieb.
 Fotos werden vom Fotobox-PC gelesen und verarbeitet; der Browser druckt nicht auf
@@ -30,6 +30,10 @@ einem eigenen Drucker des Handys oder zweiten PCs.
 4. Browserfenster auf den gewünschten Bildschirm ziehen und **Vollbild** oder F11
    wählen. Die Anzeige folgt automatisch der gemeinsamen Auswahl und Diashow.
 5. Vom Handy, Steuerungsbrowser oder Windows-Präsentationsfenster steuern.
+
+Die Einladung erscheint nach einstellbarer Zeit ohne neues Foto über dem Mosaik.
+Eigene Texte und Wartezeit werden am Fotobox-PC pro Projekt gespeichert und auch
+im Browser angezeigt. Ein neues Foto blendet die Einladung wieder aus.
 
 Die Browseranzeige aktualisiert den gemeinsamen Zustand ungefähr jede Sekunde;
 mehrere Geräte können deshalb leicht zeitversetzt reagieren. Die Acht-Sekunden-

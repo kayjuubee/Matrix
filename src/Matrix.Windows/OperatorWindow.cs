@@ -43,6 +43,7 @@ public sealed partial class OperatorWindow : Window
         panel.Children.Add(PresentationWindow.ActionButton("Neues Projekt: zuerst Logo auswählen …", CreateProject));
         panel.Children.Add(PresentationWindow.ActionButton("Gespeichertes Projekt öffnen …", OpenProject));
         panel.Children.Add(PresentationWindow.ActionButton("Präsentationsfenster öffnen", ShowPresentation));
+        panel.Children.Add(PresentationWindow.ActionButton("Einladungstext und Wartezeit einstellen …", ConfigureInvitation));
         var import = PresentationWindow.ActionButton("Fotos hinzufügen …", () => _ = SelectPhotos()); panel.Children.Add(import);
         panel.Children.Add(PresentationWindow.ActionButton("Eingangsordner überwachen …", WatchFolder));
         panel.Children.Add(PresentationWindow.ActionButton("Überwachung stoppen", () =>
@@ -62,8 +63,9 @@ public sealed partial class OperatorWindow : Window
         AddRemoteControls(panel);
         AddPreviewSharing(panel);
         scan.Tick += async (_, _) => await ScanFolder();
+        invitationClock.Tick += (_, _) => UpdateInvitation(); invitationClock.Start();
         presentationClock.Tick += (_, _) => { history?.Tick(); presentation?.RefreshSharedState(); };
-        Closed += async (_, _) => { closing = true; scan.Stop(); presentationClock.Stop(); presentation?.Close(); if (!busy) projectLock?.Dispose(); if (remoteServer is not null) await remoteServer.DisposeAsync(); if (guestServer is not null) await guestServer.DisposeAsync(); };
+        Closed += async (_, _) => { closing = true; scan.Stop(); presentationClock.Stop(); invitationClock.Stop(); presentation?.Close(); if (!busy) projectLock?.Dispose(); if (remoteServer is not null) await remoteServer.DisposeAsync(); if (guestServer is not null) await guestServer.DisposeAsync(); };
     }
 
     private bool CanChangeProject()
@@ -77,7 +79,7 @@ public sealed partial class OperatorWindow : Window
         if (!CanChangeProject()) return;
         try
         {
-            var dialog = new OpenFileDialog { Title = "Großes Motiv auswählen", Filter = ImageFilter };
+            var dialog = new OpenFileDialog { Title = "Logo / großes Motiv auswählen", Filter = "Logos und Bilder|*.svg;*.jpg;*.jpeg;*.png;*.webp;*.bmp|SVG-Vektorlogo|*.svg" };
             if (dialog.ShowDialog(this) != true) return;
             if (!CanChangeProject()) return;
             var setup = new GridSetupWindow(dialog.FileName) { Owner = this };
@@ -101,6 +103,7 @@ public sealed partial class OperatorWindow : Window
         try
         {
             var saved = JsonSerializer.Deserialize<SavedProject>(File.ReadAllText(dialog.FileName)) ?? throw new IOException("Leere Projektdatei.");
+            saved.Invitation?.Validate();
             var nextGrid = new MosaicGrid(saved.Columns, saved.Rows, saved.Format); nextGrid.Validate();
             var nextHistory = new PresentationHistory(nextGrid);
             string dir = Path.GetDirectoryName(dialog.FileName)!;
@@ -128,6 +131,7 @@ public sealed partial class OperatorWindow : Window
         scan.Stop(); inputDirectory = null; observed.Clear(); presentation?.Close(); presentation = null;
         projectDirectory = dir; grid = nextGrid; history = nextHistory;
         mosaicVisible = false; ResetPresentationClock();
+        invitationSettings = saved?.Invitation ?? new InvitationSettings(); lastPhotoAt = DateTimeOffset.UtcNow;
         remoteImages.Clear();
         savedPhotos.Clear(); savedPhotos.AddRange((saved?.Photos ?? []).Select(PrintRecovery.AfterRestart));
         printerName = saved?.PrinterName; printEnabled = false; lastPrintError = null; UpdatePrintStatus();
@@ -151,7 +155,7 @@ public sealed partial class OperatorWindow : Window
                 window.Closed += (_, _) => presentation = null;
                 window.PlaybackChanged += ResetPresentationClock;
                 window.MosaicChanged += visible => mosaicVisible = visible;
-                presentation = window; window.Show();
+                presentation = window; window.Show(); UpdateInvitation();
             }
             else { presentation.Show(); presentation.Activate(); }
         }
@@ -246,7 +250,7 @@ public sealed partial class OperatorWindow : Window
                         try { SaveProject(); }
                         catch { savedPhotos.RemoveAt(savedPhotos.Count - 1); throw; }
                         history.Add(new(id, tile, column, row));
-                        ResetPresentationClock(); presentation?.NewArrival();
+                        PhotoArrived(); ResetPresentationClock(); presentation?.NewArrival();
                         status.Text = $"Neues Bild: {grid.Coordinate(column, row)} · {history.Items.Count} von {grid.Columns * grid.Rows}";
                     }
                     finally { File.Delete(snapshot); }
@@ -265,7 +269,7 @@ public sealed partial class OperatorWindow : Window
     {
         if (grid is null || projectDirectory is null) return;
         string manifest = Path.Combine(projectDirectory, "project.json");
-        File.WriteAllText(manifest + ".tmp", JsonSerializer.Serialize(new SavedProject(grid.Columns, grid.Rows, savedPhotos, grid.Format, printerName)));
+        File.WriteAllText(manifest + ".tmp", JsonSerializer.Serialize(new SavedProject(grid.Columns, grid.Rows, savedPhotos, grid.Format, printerName, invitationSettings)));
         File.Move(manifest + ".tmp", manifest, true);
     }
 

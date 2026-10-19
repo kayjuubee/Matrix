@@ -3,7 +3,8 @@ namespace Matrix.Remote;
 public sealed record RemotePhoto(string Id, string Coordinate, int Column, int Row, string PrintState);
 public sealed record RemoteState(string? ProjectId, int Columns, int Rows, double TileAspect,
     int Total, int Remaining, IReadOnlyList<RemotePhoto> Photos, string? CurrentId,
-    bool Slideshow, bool MosaicVisible, bool Monitoring, bool Printing, string? Printer, string? Error);
+    bool Slideshow, bool MosaicVisible, bool Monitoring, bool Printing, string? Printer, string? Error,
+    string? InvitationMessage = null);
 public sealed record RemoteCommand(string Action, string ProjectId, string RequestId, string? ImageId = null, bool ConfirmReprint = false);
 public sealed record RemoteResult(bool Success, string Message);
 

@@ -82,7 +82,7 @@ public sealed partial class OperatorWindow
         return new(projectDirectory is null ? null : Path.GetFileName(projectDirectory), grid?.Columns ?? 0, grid?.Rows ?? 0,
             grid?.TileAspect ?? 1.5, grid is null ? 0 : grid.Columns * grid.Rows,
             grid is null ? 0 : GridPlanning.Remaining(grid, photos.Length), photos, history?.Current?.Id,
-            history?.IsPlaying ?? false, mosaicVisible, scan.IsEnabled, printEnabled, printerName, lastPrintError);
+            history?.IsPlaying ?? false, mosaicVisible, scan.IsEnabled, printEnabled, printerName, lastPrintError, CurrentInvitation());
     }
 
     private RemoteResult RemoteExecute(RemoteCommand command)
