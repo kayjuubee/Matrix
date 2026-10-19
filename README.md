@@ -146,6 +146,69 @@ versucht alle zwei Sekunden erneut, den aktuellen Stand zu laden. Auch „Browse
 Steuerung stoppen“ unterbricht keine lokalen Arbeitsabläufe. Erst das Schließen
 von Matrix beendet die Windows-Anwendung und ihren Webserver.
 
+## Gästevorschau per QR-Code teilen
+
+Die Gästevorschau ist eine zusätzliche, eigenständige Freigabe auf **Port 8788**.
+Sie zeigt das wachsende Mosaik, Restzahl und einzelne Fotokacheln. Sie enthält
+keine Steuerungs-, Import- oder Druckfunktionen und keine Drucker-/Fehlerdaten.
+Der Zugangscode der Bedienoberfläche gehört nicht in den Gäste-QR-Code.
+
+1. Projekt öffnen und **„Vorschau teilen / QR-Code …“** wählen.
+2. Für das WLAN die Adresse des Fotobox-PCs mit Port **8788** auswählen, zum
+   Beispiel `http://192.168.1.50:8788`. Das Gerät muss den PC im Netz erreichen
+   können; bei einer Firewall TCP 8788 für das private lokale Netz erlauben.
+3. „Link und QR-Code erstellen“ anklicken. Der vollständige Link enthält die
+   Freigabekennung. Jeder mit diesem Link kann die Bilder dieses Projekts ansehen,
+   ohne App und ohne Eingabe des Steuerungscodes.
+4. Link kopieren oder **„QR-Code als PNG speichern“** verwenden, beispielsweise
+   zum Anzeigen auf einem Bildschirm oder zum Ausdrucken für Gäste.
+5. „Vorschau-Freigabe beenden“ sperrt den bisherigen Link. Auch bei einem
+   Projektwechsel wird die Freigabe beendet; ein Link darf niemals unbemerkt
+   die Fotos der nächsten Veranstaltung zeigen. Danach einen neuen QR-Code erzeugen.
+
+Das Schließen des QR-Fensters beendet die laufende Freigabe nicht. Sie läuft bis
+zum bewussten Beenden, Projektwechsel oder Programmende. Nach einem Neustart ist
+ein neuer QR-Code erforderlich. Das Stoppen der Fernsteuerung auf 8787 betrifft
+die separate Gästevorschau nicht und umgekehrt. Die Vorschau aktualisiert sich
+alle drei Sekunden; bei Verbindungsproblemen zeigt sie den letzten geladenen
+Stand. Vor der ersten Erreichbarkeit von einem echten Gastgerät ist die Anzeige
+im QR-Fenster noch kein Nachweis für einen funktionierenden Netzwerkzugang.
+
+### Öffentlich über das Internet, ohne Tailscale-App bei Gästen
+
+Eine private Tailscale-Serve-Adresse ist nicht für beliebige Gäste erreichbar.
+Dafür lässt sich **Tailscale Funnel** auf dem Fotobox-PC einrichten. Dabei werden
+nur Vorschau-Port **8788**, nicht Steuerungs-Port **8787**, veröffentlicht.
+Die Veröffentlichung erfolgt auf deinem PC, nicht automatisch aus dieser
+Entwicklungsumgebung. Matrix und Internetverbindung müssen weiterlaufen.
+
+Mit Tailscale auf dem PC angemeldet und Gästevorschau gestartet:
+
+```powershell
+tailscale funnel --bg --https=8443 http://127.0.0.1:8788
+```
+
+Den Einrichtungsdialog von Tailscale einschließlich erforderlicher Funnel-/HTTPS-
+Freigabe im eigenen Konto abschließen. Die tatsächlich ausgegebene öffentliche
+HTTPS-Basisadresse inklusive **`:8443`** in das QR-Fenster übernehmen, anschließend
+„Link und QR-Code erstellen“ wählen. Gäste benötigen dann weder Tailscale noch
+eine Mitgliedschaft im WLAN. Mit dem eigenen Handy über Mobilfunk ausprobieren.
+
+Der separate HTTPS-Port 8443 lässt eine vorhandene private Steuerung über
+Tailscale Serve auf 443 bestehen. Falls auf 8443 schon ein eigener Dienst läuft,
+dessen Konfiguration nicht überschreiben, sondern einen freien unterstützten
+Port wählen. `tailscale funnel status` zeigt die bestehende Freigabe. Die gezielte
+Funnel-Weiterleitung kann mit `tailscale funnel --https=8443 off` beendet werden;
+das ist unabhängig vom Sperren des Matrix-Freigabelinks.
+Offizielle Anleitung: https://tailscale.com/kb/1223/funnel.
+
+Der Link ist die Berechtigung zum Ansehen. Er wird als URL-Fragment im QR-Code
+übertragen und nicht als Anfragepfad oder Zugangscode an die Steuerung geschickt.
+Der QR-Code entsteht lokal (QRCoder, MIT-Lizenz), ohne Bilder oder Links an einen
+externen QR-Dienst zu senden. Die Internetverbindung läuft bei Funnel über dessen
+Infrastruktur. Bereits von Gästen angesehene/gespeicherte Bilder lassen sich durch
+Sperren des Links nicht von deren Geräten zurückholen.
+
 ## Import und Speicherung
 
 Projekte werden unter `%LOCALAPPDATA%\Matrix\Projects\<Kennung>` abgelegt. Der
@@ -232,6 +295,38 @@ angezeigt werden. Neue Importe sind dort gesperrt, damit alte und neue Formate n
 vermischt werden. Für 10 × 15 cm ein neues Projekt mit den Originalfotos anlegen;
 aus bereits beschnittenen alten PNGs lassen sich fehlende Bildteile nicht zurückholen.
 
+## Veranstaltungsabschluss: Restfelder mit oder ohne Fotos
+
+Am Ende eines Events **„Restfelder abschließen (mit / ohne Fotos)“** wählen.
+Das Programm zeigt die genaue Zahl noch freier Felder und zusätzlicher Druckaufträge.
+Danach besteht die Wahl:
+
+- **Mit Fotos:** Original-/Fotoboxfotos auswählen. Sie werden proportional ohne
+  Zuschnitt mit dem passenden Motivausschnitt überlagert. Reichen die ausgewählten
+  Fotos nicht für alle Restfelder, werden sie wiederverwendet. Keine bereits mit
+  dem Logo überlagerten Matrix-PNGs auswählen, da das Motiv sonst zweimal enthalten wäre.
+- **Ohne Fotos:** Nur die fehlenden Ausschnitte des großen Motivs erzeugen, mit
+  voller Motivdeckkraft auf weißem Hintergrund bei Transparenz.
+
+Erst **„Kacheln erzeugen und Drucke vormerken“** bestätigt den gewählten Abschluss.
+Belegte Felder und ihre Zuordnung bleiben erhalten. Die Restfelder werden in
+zufälliger Reihenfolge ergänzt. Die neuen Kacheln erscheinen in Präsentation und
+Gästevorschau und sind mit derselben Größe wie die übrigen Fotos druckbereit.
+
+Import und Zusatzdruck sind während des Abschlusses pausiert. Nach dem Erzeugen
+bleiben sie pausiert; mit „Zusatzdruck einrichten / starten“ am PC oder „Zusatzdruck
+fortsetzen“ in der angemeldeten Browser-Steuerung die wartenden Aufträge bewusst
+freigeben. Auch schon vorher wartende Druckaufträge bleiben in der Warteschlange.
+Falls noch kein Drucker eingerichtet ist, zuerst den RX1 mit passendem Papierformat
+wählen. Die Abschlussfunktion sendet nicht sofort unbemerkt alle Ausdrucke ab.
+
+**„Laufenden Abschluss abbrechen“** stoppt nach der gerade bearbeiteten Kachel.
+Bereits erzeugte Kacheln und Aufträge bleiben gespeichert. Bei einem Fehler wird
+angehalten; erneutes Starten ergänzt nur die dann noch freien Felder. Abbrechen
+im anfänglichen Auswahldialog stellt den vorherigen Import-/Druckbetrieb wieder her.
+Der Restzähler zählt auch diese Abschlusskacheln als belegte Felder; er ist kein
+Zähler ausschließlich neu aufgenommener Gästefotos und keine Druckbestätigung.
+
 ## Bildverarbeitung und CLI
 
 SkiaSharp wird unter MIT-Lizenz verwendet.
@@ -261,7 +356,10 @@ Tests prüfen Rastervorschläge für verschiedene Logoformate und Bildanzahlen,
 Zufallsvergabe ohne doppelte Felder bis zur vollständig belegten Matrix und den
 von der Diashow unabhängigen Restzähler. Echte HTTP-Tests prüfen den Webserver,
 Anmeldeschutz für Status/Bilder/Befehle, Loginbegrenzung, Sitzungswiderruf und die
-Vermeidung doppelter Befehlsausführung bei parallelen Wiederholungen.
+Vermeidung doppelter Befehlsausführung bei parallelen Wiederholungen. Zusätzliche
+Tests prüfen Gästezugang, fehlende Schreib-/Druckrouten, Trennung der Zugangstoken,
+Projektbindung, Linkvalidierung und QR-PNG-Erzeugung. Die Abschlussplanung und
+vollfarbige Motivkacheln ohne Foto werden ebenfalls geprüft.
 
 Manuelle Abnahme unter Windows:
 
@@ -301,6 +399,15 @@ Manuelle Abnahme unter Windows:
 14. Mit Tailscale auf dem Handy WLAN abschalten und über Mobilfunk verbinden.
     Vorschau/Befehle prüfen. Verbindung trennen: lokale Importe und Drucke laufen
     weiter. Browser-Steuerung stoppen/neu starten: alter Zugang nicht mehr gültig.
+15. Gäste-QR-Code am Handy scannen: Mosaik und Kacheln sichtbar, keine Steuerung.
+    Projektwechsel oder Freigabeende: alter Link gibt keine neuen Fotos mehr frei.
+16. Für öffentliche Freigabe Funnel auf 8443 → 8788 einrichten, öffentlichen Link
+    als QR-Code erzeugen und auf einem Handy ohne Tailscale über Mobilfunk testen.
+    Private Steuerung auf 443 muss dabei weiterhin nur über Tailscale erreichbar sein.
+17. Ein kleines Projekt teilweise belegen und Abschluss mit ausgewählten Fotos testen:
+    vorhandene Felder unverändert, nur fehlende Felder ergänzt, Drucke noch pausiert.
+    In einem zweiten Projekt „ohne Fotos“ wählen: richtige vollständige Motivausschnitte.
+    Abbrechen/erneutes Starten erzeugt keine zweite Zuordnung für belegte Felder.
 
 ## Noch offen
 

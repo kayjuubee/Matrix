@@ -12,7 +12,7 @@ public class RemoteServerTests
         public int Commands;
         public Task<RemoteState> ReadState() => Task.FromResult(new RemoteState("project", 5, 5, 1.5, 25, 24,
             [new(new string('A', 64), "D03", 3, 2, "Pending")], new string('A', 64), false, false, true, false, "RX1", null));
-        public Task<byte[]?> ReadImage(string id, bool large = false) => Task.FromResult<byte[]?>(id == "master" ? [1, 2, 3] : null);
+        public Task<byte[]?> ReadImage(string id, bool large = false, string? projectId = null) => Task.FromResult<byte[]?>(id == "master" ? [1, 2, 3] : null);
         public Task<RemoteResult> Execute(RemoteCommand command)
         { Interlocked.Increment(ref Commands); return Task.FromResult(new RemoteResult(true, "Übernommen")); }
     }

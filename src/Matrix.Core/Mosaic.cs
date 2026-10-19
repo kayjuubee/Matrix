@@ -44,12 +44,19 @@ public static class Mosaic
 
     public static SKBitmap Render(string photoPath, string masterPath, Grid grid,
         int column, int row, int size = 1800, float opacity = 0.4f)
+        => RenderTile(photoPath, masterPath, grid, column, row, size, opacity);
+
+    public static SKBitmap RenderLogoTile(string masterPath, Grid grid, int column, int row, int size = 1800)
+        => RenderTile(null, masterPath, grid, column, row, size, 1);
+
+    private static SKBitmap RenderTile(string? photoPath, string masterPath, Grid grid,
+        int column, int row, int size, float opacity)
     {
         grid.Coordinate(column, row);
         if (size is < 100 or > 2400 || !float.IsFinite(opacity) || opacity < 0 || opacity > 1)
             throw new ArgumentOutOfRangeException(nameof(size));
         using var master = LoadOriented(masterPath);
-        using var photo = LoadOriented(photoPath);
+        using var photo = photoPath is null ? null : LoadOriented(photoPath);
         int width = grid.TileAspect >= 1 ? size : (int)Math.Round(size * grid.TileAspect);
         int height = grid.TileAspect >= 1 ? (int)Math.Round(size / grid.TileAspect) : size;
         var tile = new SKBitmap(width, height);
@@ -59,18 +66,27 @@ public static class Mosaic
             {
                 canvas.Clear(SKColors.White);
                 // Fit the complete photo without cropping, stretching or implicit rotation.
-                float scale = Math.Min((float)width / photo.Width, (float)height / photo.Height);
-                float photoWidth = photo.Width * scale, photoHeight = photo.Height * scale;
-                var destination = new SKRect((width - photoWidth) / 2, (height - photoHeight) / 2,
-                    (width + photoWidth) / 2, (height + photoHeight) / 2);
-                canvas.DrawBitmap(photo, new SKRect(0, 0, photo.Width, photo.Height), destination, new SKSamplingOptions(SKFilterMode.Linear));
+                if (photo is not null)
+                {
+                    float scale = Math.Min((float)width / photo.Width, (float)height / photo.Height);
+                    float photoWidth = photo.Width * scale, photoHeight = photo.Height * scale;
+                    var destination = new SKRect((width - photoWidth) / 2, (height - photoHeight) / 2,
+                        (width + photoWidth) / 2, (height + photoHeight) / 2);
+                    canvas.DrawBitmap(photo, new SKRect(0, 0, photo.Width, photo.Height), destination, new SKSamplingOptions(SKFilterMode.Linear));
+                }
                 var crop = CenterCrop(master.Width, master.Height, (float)grid.WallAspect);
                 var cell = new SKRect(crop.Left + column * crop.Width / grid.Columns,
                     crop.Top + row * crop.Height / grid.Rows,
                     crop.Left + (column + 1) * crop.Width / grid.Columns,
                     crop.Top + (row + 1) * crop.Height / grid.Rows);
                 using var paint = new SKPaint { Color = SKColors.White.WithAlpha((byte)Math.Round(opacity * 255)) };
-                canvas.DrawBitmap(master, cell, new SKRect(0, 0, width, height), new SKSamplingOptions(SKFilterMode.Linear), paint);
+                // Isolate the cell before scaling so linear filtering cannot sample a neighboring cell.
+                var bounds = new SKRectI(Math.Max(0, (int)Math.Floor(cell.Left)), Math.Max(0, (int)Math.Floor(cell.Top)),
+                    Math.Min(master.Width, (int)Math.Ceiling(cell.Right)), Math.Min(master.Height, (int)Math.Ceiling(cell.Bottom)));
+                using var fragment = new SKBitmap();
+                if (!master.ExtractSubset(fragment, bounds)) throw new ArgumentException("Motivausschnitt konnte nicht erzeugt werden.");
+                var localCell = new SKRect(cell.Left - bounds.Left, cell.Top - bounds.Top, cell.Right - bounds.Left, cell.Bottom - bounds.Top);
+                canvas.DrawBitmap(fragment, localCell, new SKRect(0, 0, width, height), new SKSamplingOptions(SKFilterMode.Linear), paint);
             }
             return tile;
         }

@@ -10,6 +10,6 @@ public sealed record RemoteResult(bool Success, string Message);
 public interface IRemoteController
 {
     Task<RemoteState> ReadState();
-    Task<byte[]?> ReadImage(string id, bool large = false);
+    Task<byte[]?> ReadImage(string id, bool large = false, string? projectId = null);
     Task<RemoteResult> Execute(RemoteCommand command);
 }

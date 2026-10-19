@@ -92,11 +92,13 @@ public sealed partial class OperatorWindow
                 return new(presentation?.RemoteAction(command.Action, command.ImageId) == true, "Präsentationssteuerung aktualisiert.");
             case "monitor-pause": scan.Stop(); return new(true, "Import pausiert. Laufender Import wird noch abgeschlossen.");
             case "monitor-resume":
+                if (completing) return new(false, "Veranstaltungsabschluss läuft. Bitte zuerst abschließen oder abbrechen.");
                 if (inputDirectory is null) return new(false, "Bitte zuerst am PC einen Eingangsordner auswählen.");
                 if (history.Items.Count >= grid.Columns * grid.Rows) return new(false, "Das Mosaik ist vollständig.");
                 scan.Start(); return new(true, "Ordnerüberwachung fortgesetzt.");
             case "print-pause": printEnabled = false; UpdatePrintStatus(); return new(true, "Weitere Zusatzdrucke pausiert. Bereits an Windows übergebene Aufträge laufen weiter.");
             case "print-resume":
+                if (completing) return new(false, "Veranstaltungsabschluss läuft. Drucke können anschließend freigegeben werden.");
                 if (printerName is null || !File.Exists(Path.Combine(projectDirectory, "print-ticket.xml")))
                     return new(false, "Bitte zuerst Drucker und Papierformat am PC einrichten.");
                 if (!CanImportFormat()) return new(false, "Altes quadratisches Projekt: nur Ansicht.");
@@ -126,11 +128,12 @@ public sealed partial class OperatorWindow
             try { return await owner.Dispatcher.InvokeAsync(() => owner.RemoteExecute(command)); }
             catch (Exception ex) { return new(false, "Aktion fehlgeschlagen: " + ex.Message); }
         }
-        public async Task<byte[]?> ReadImage(string id, bool large = false)
+        public async Task<byte[]?> ReadImage(string id, bool large = false, string? projectId = null)
         {
             var spec = await owner.Dispatcher.InvokeAsync(() =>
             {
                 if (owner.projectDirectory is null || owner.grid is null) return null;
+                if (projectId is not null && projectId != Path.GetFileName(owner.projectDirectory)) return null;
                 string? path = id == "master" ? Path.Combine(owner.projectDirectory, "master") : owner.history?.Items.FirstOrDefault(p => p.Id == id)?.TilePath;
                 return path is null ? null : new ImageSpec(path, owner.grid, id == "master");
             });

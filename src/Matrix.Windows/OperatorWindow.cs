@@ -54,10 +54,13 @@ public sealed partial class OperatorWindow : Window
         panel.Children.Add(PresentationWindow.ActionButton("Zusatzdruck pausieren", () => { printEnabled = false; UpdatePrintStatus(); }));
         panel.Children.Add(PresentationWindow.ActionButton("Ausgewähltes Bild drucken / nachdrucken", QueueSelectedPhoto));
         panel.Children.Add(printStatus);
+        panel.Children.Add(PresentationWindow.ActionButton("Restfelder abschließen (mit / ohne Fotos) …", async () => await CompleteRemaining()));
+        panel.Children.Add(PresentationWindow.ActionButton("Laufenden Abschluss abbrechen", () => completionCancel?.Cancel()));
         panel.Children.Add(projectLabel); panel.Children.Add(status);
         AddRemoteControls(panel);
+        AddPreviewSharing(panel);
         scan.Tick += async (_, _) => await ScanFolder();
-        Closed += async (_, _) => { closing = true; scan.Stop(); presentation?.Close(); if (!busy) projectLock?.Dispose(); if (remoteServer is not null) await remoteServer.DisposeAsync(); };
+        Closed += async (_, _) => { closing = true; scan.Stop(); presentation?.Close(); if (!busy) projectLock?.Dispose(); if (remoteServer is not null) await remoteServer.DisposeAsync(); if (guestServer is not null) await guestServer.DisposeAsync(); };
     }
 
     private bool CanChangeProject()
@@ -118,6 +121,7 @@ public sealed partial class OperatorWindow : Window
             var nextLock = new FileStream(Path.Combine(dir, "project.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
             projectLock?.Dispose(); projectLock = nextLock;
         }
+        _ = StopGuestSharing();
         scan.Stop(); inputDirectory = null; observed.Clear(); presentation?.Close(); presentation = null;
         projectDirectory = dir; grid = nextGrid; history = nextHistory;
         remoteImages.Clear();
