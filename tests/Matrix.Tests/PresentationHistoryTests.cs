@@ -3,6 +3,16 @@ using Xunit;
 
 public class PresentationHistoryTests
 {
+    [Fact] public void SelectingSpecificRemotePhotoPausesSlideshowAndNewArrivalStillWins()
+    {
+        var history = new PresentationHistory(new Grid(5, 1));
+        history.Add(Item(0)); history.Add(Item(1)); history.ToggleSlideshow();
+        Assert.True(history.Select(Item(0).Id));
+        Assert.Equal(Item(0), history.Current); Assert.False(history.IsPlaying);
+        Assert.False(history.Select("missing")); Assert.Equal(Item(0), history.Current);
+        history.Add(Item(2)); Assert.Equal(Item(2), history.Current);
+    }
+
     private static PresentationItem Item(int n) => new($"photo-{n}", $"tile-{n}.png", n, 0);
 
     [Fact] public void NewArrivalInterruptsHistoryAndDuplicateDoesNotMoveSelection()

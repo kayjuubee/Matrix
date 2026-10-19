@@ -9,5 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Matrix.Core/Matrix.Core.csproj" />
+    <ProjectReference Include="../Matrix.Remote/Matrix.Remote.csproj" />
   </ItemGroup>
 </Project>

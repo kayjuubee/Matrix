@@ -25,6 +25,7 @@ public sealed class PresentationWindow : Window
     private bool showMosaic;
     private bool loadingPreview;
     private bool closed;
+    public bool MosaicVisible => showMosaic;
     private readonly double cellWidth;
     private const double CellHeight = 60;
     private readonly Rectangle highlight;
@@ -151,6 +152,22 @@ public sealed class PresentationWindow : Window
         // Give each new image a full slide interval, even if the previous timer was about to tick.
         ResetTimer(); Refresh();
         if (showMosaic) _ = UpdateMosaicPreview();
+    }
+
+    public bool RemoteAction(string action, string? imageId)
+    {
+        switch (action)
+        {
+            case "previous": history.Previous(); break;
+            case "next": history.Next(); break;
+            case "latest": history.Latest(); break;
+            case "select": if (imageId is null || !history.Select(imageId)) return false; break;
+            case "slideshow": history.ToggleSlideshow(); break;
+            case "mosaic": ToggleMosaic(); break;
+            case "presentation": break;
+            default: return false;
+        }
+        ResetTimer(); Refresh(); return true;
     }
 
     private void ResetTimer() { slideshow.Stop(); if (history.IsPlaying) slideshow.Start(); }

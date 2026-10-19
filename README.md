@@ -52,11 +52,99 @@ Kacheln, nicht bestätigte Ausdrucke oder physisch aufgeklebte Fotos.
 Die Gesamtansicht lädt kleine Vorschaubilder im Hintergrund und hält sie im
 Speicher. Beim ersten Öffnen erscheint der Ladefortschritt; erneutes Umschalten
 verwendet die bereits geladenen Bilder. Neue Importe ergänzen nur ihre eigene
-Kachel. Die Druckbilder werden dabei nicht neu berechnet. Es handelt sich um eine
-lokale Programmvorschau, keinen Weblink und keinen Upload.
+Kachel. Die Druckbilder werden dabei nicht neu berechnet. Die Vorschau im Präsentationsfenster bleibt lokal; die separat aktivierbare
+Browser-Steuerung kann dieselben Fotokacheln an angemeldete Geräte im lokalen Netz
+oder über Tailscale ausliefern. Es gibt keinen automatischen Upload zu einer Cloud.
 
 Das Schließen des Präsentationsfensters beendet den Import nicht; es kann wieder
 geöffnet werden. Das Schließen des Steuerungsfensters beendet die Anwendung.
+
+## Steuerung am PC, im WLAN und über das Internet
+
+Die Windows-Steuerung auf dem Fotobox-Rechner bleibt vollständig verfügbar.
+Zusätzlich ist eine für Handy und Tablet geeignete Browser-Steuerung eingebaut.
+Projekt, Logo/Raster, Eingangsordner und RX1-Druckeinstellungen werden zunächst
+am Fotobox-Rechner eingerichtet. Danach lassen sich aus dem Browser bedienen:
+
+- Gesamtmosaik, aktuelles Foto, Koordinate, Restzahl und Druckstatus ansehen;
+- zurück/weiter, neuestes Bild und Diashow steuern;
+- belegte Rasterfelder antippen, um ein bestimmtes Foto auszuwählen;
+- Mosaikansicht auf dem Präsentationsbildschirm umschalten;
+- Ordnerüberwachung und Zusatzdruck pausieren/fortsetzen;
+- für ein konkret ausgewähltes Foto einen bestätigten Zusatz-/Nachdruck anfordern.
+
+### Auf dem Fotobox-Rechner und im WLAN
+
+1. Im Windows-Programm **„Browser-Steuerung starten“** wählen. Der Zugang ist
+   standardmäßig ausgeschaltet und wird beim nächsten Programmstart nicht
+   automatisch gestartet. Ein zufälliger Zugangscode und die Rechneradressen
+   erscheinen im Steuerungsfenster; der Text kann markiert und kopiert werden.
+2. Am selben Rechner „Steuerung hier im Browser öffnen“ verwenden. Alternativ
+   `http://127.0.0.1:8787` öffnen und den angezeigten Code eingeben.
+3. Handy oder zweiten Rechner mit demselben lokalen Netz verbinden. Eine der
+   angezeigten WLAN-/LAN-Adressen, beispielsweise `http://192.168.1.50:8787`, im
+   Browser öffnen und den Zugangscode eingeben. Eine App auf dem Handy ist im
+   WLAN nicht nötig. Angezeigte VPN-/virtuelle Adapteradressen sind nicht in jedem
+   WLAN erreichbar; die zum gemeinsamen Netz passende Adresse verwenden.
+4. Falls Windows den Netzwerkzugriff abfragt, ihn für das **private** Netz erlauben.
+   Bei einer bestehenden Firewall muss eingehendes TCP 8787 im privaten lokalen
+   Netz erlaubt sein. Gäste-WLAN mit Client-Isolation funktioniert nicht.
+
+### Über das Internet mit Tailscale
+
+Die Anwendung richtet keine öffentliche Router-Portfreigabe ein. Für den privaten
+Fernzugang Tailscale auf dem Fotobox-PC und dem Handy/zweiten Rechner installieren
+und beide Geräte im selben eigenen Tailscale-Netz anmelden. Das kann nur auf den
+jeweiligen Geräten erfolgen; die Cloud-Entwicklung richtet deinen Account oder
+PC dabei nicht automatisch ein.
+
+Empfohlener Zugang mit HTTPS über **Tailscale Serve**:
+
+1. Matrix auf dem Fotobox-PC starten und die Browser-Steuerung einschalten.
+2. Tailscale auf PC und Handy verbinden. Auf dem PC in PowerShell ausführen:
+
+   ```powershell
+   tailscale serve --bg http://127.0.0.1:8787
+   ```
+
+3. Falls Tailscale zur Aktivierung von HTTPS/Serve auffordert, den angezeigten
+   Einrichtungsschritten folgen. Die ausgegebene HTTPS-Adresse auf dem Handy
+   öffnen und den Matrix-Zugangscode eingeben. Tailscale muss am Handy verbunden
+   bleiben; die Seite ist nur für berechtigte Geräte im eigenen Tailscale-Netz.
+4. Die aktuelle Serve-Adresse lässt sich mit `tailscale serve status` prüfen;
+   diese Weiterleitung mit `tailscale serve reset` wieder entfernen. Reset entfernt
+   die Serve-Konfiguration dieses Rechners, also bei weiteren eigenen Serve-Diensten
+   stattdessen gezielt deren bestehende Konfiguration berücksichtigen.
+
+Alternativ funktioniert die im Programm angezeigte `http://100.x.x.x:8787`-Adresse
+über die private Tailscale-Verbindung, wenn die Windows-Firewall diesen Zugriff
+zulässt. Mit Serve bleibt der Zugriff auf Matrix am PC über die Loopback-Adresse.
+Tailscale Funnel beziehungsweise eine öffentliche Freigabe werden nicht benötigt.
+Offizielle Einrichtung: https://tailscale.com/download und
+https://tailscale.com/kb/1242/tailscale-serve.
+
+### Verhalten und Zugriffsschutz
+
+Lokale Oberfläche und Browser teilen sich Projekt, aktuelle Fotoauswahl und
+Präsentationszustand. Neu eintreffende Bilder werden weiterhin sofort ausgewählt.
+Nachdrucke beziehen sich auf die konkrete, im Browser bestätigte Bildkennung;
+neu eingetroffene Fotos ändern diesen Auftrag nicht. Eine veraltete Browseransicht
+kann keinen Auftrag in einem inzwischen gewechselten Projekt auslösen. Wiederholte
+identische Browseraufträge werden im laufenden Server abgefangen, damit eine
+verlorene Antwort keinen doppelten Zusatzdruck verursacht.
+
+Ohne Zugangscode sind Foto-, Status- und Steuerungs-APIs gesperrt; Fehlversuche beim
+Login sind begrenzt. Nach dem Stoppen und erneuten Starten der Browser-Steuerung
+gibt es einen neuen Code; vorherige Browsersitzungen müssen sich neu anmelden.
+„Abmelden“ beendet nur die Sitzung in diesem Browser. Der Code gehört den Bedienern;
+die HTTP-Adresse im WLAN für ein vertrauenswürdiges Netz nutzen, HTTPS über
+Tailscale Serve für den privaten Internetzugang.
+
+Bei verlorener WLAN-/Internetverbindung laufen lokale Ordnerüberwachung,
+Präsentation und Druck weiter. Der Browser zeigt die unterbrochene Verbindung und
+versucht alle zwei Sekunden erneut, den aktuellen Stand zu laden. Auch „Browser-
+Steuerung stoppen“ unterbricht keine lokalen Arbeitsabläufe. Erst das Schließen
+von Matrix beendet die Windows-Anwendung und ihren Webserver.
 
 ## Import und Speicherung
 
@@ -171,7 +259,9 @@ rechteckige Rastergeometrie und Formatpersistenz sowie Historie, Diashow,
 Vorrang neuer Bilder und die sichere Wiederaufnahme von Druckaufträgen. Weitere
 Tests prüfen Rastervorschläge für verschiedene Logoformate und Bildanzahlen,
 Zufallsvergabe ohne doppelte Felder bis zur vollständig belegten Matrix und den
-von der Diashow unabhängigen Restzähler.
+von der Diashow unabhängigen Restzähler. Echte HTTP-Tests prüfen den Webserver,
+Anmeldeschutz für Status/Bilder/Befehle, Loginbegrenzung, Sitzungswiderruf und die
+Vermeidung doppelter Befehlsausführung bei parallelen Wiederholungen.
 
 Manuelle Abnahme unter Windows:
 
@@ -204,6 +294,13 @@ Manuelle Abnahme unter Windows:
     Zurückblättern und dieselbe Datei erneut einlesen: Restzähler unverändert.
     Projekt neu laden: Feldzuordnung und Restzahl bleiben gleich; bei vollständiger
     Matrix erscheint die Fertigmeldung.
+13. Browser-Steuerung aktivieren und im Handy-Browser anmelden. Auswahl und
+    Diashow mit dem zweiten Bildschirm abgleichen. Nachdruck für eine konkrete
+    Kachel bestätigen und zwischenzeitlich ein neues Foto importieren: nur die
+    bestätigte Koordinate darf als Zusatzdruck angefordert werden.
+14. Mit Tailscale auf dem Handy WLAN abschalten und über Mobilfunk verbinden.
+    Vorschau/Befehle prüfen. Verbindung trennen: lokale Importe und Drucke laufen
+    weiter. Browser-Steuerung stoppen/neu starten: alter Zugang nicht mehr gültig.
 
 ## Noch offen
 

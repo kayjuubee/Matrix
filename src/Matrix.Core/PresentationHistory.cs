@@ -25,6 +25,12 @@ public sealed class PresentationHistory(Grid grid)
     public void Previous() { IsPlaying = false; if (Index > 0) Index--; }
     public void Next() { IsPlaying = false; if (Index + 1 < items.Count) Index++; }
     public void Latest() { IsPlaying = false; Index = items.Count - 1; }
+    public bool Select(string id)
+    {
+        int index = items.FindIndex(item => item.Id == id);
+        if (index < 0) return false;
+        Index = index; IsPlaying = false; return true;
+    }
     public void ToggleSlideshow() => IsPlaying = !IsPlaying;
     public void Tick() { if (IsPlaying && items.Count > 0) Index = (Index + 1) % items.Count; }
 }

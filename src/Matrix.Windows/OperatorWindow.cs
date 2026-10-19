@@ -11,7 +11,7 @@ using MosaicGrid = Matrix.Core.Grid;
 
 namespace Matrix.Windows;
 
-public sealed class OperatorWindow : Window
+public sealed partial class OperatorWindow : Window
 {
     private readonly TextBlock status = new() { Text = "Neues Projekt anlegen oder ein gespeichertes Projekt öffnen.", TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock printStatus = new() { Text = "Zusatzdruck pausiert · noch kein Drucker gewählt", TextWrapping = TextWrapping.Wrap };
@@ -44,7 +44,7 @@ public sealed class OperatorWindow : Window
         var import = PresentationWindow.ActionButton("Fotos hinzufügen …", () => _ = SelectPhotos()); panel.Children.Add(import);
         panel.Children.Add(PresentationWindow.ActionButton("Eingangsordner überwachen …", WatchFolder));
         panel.Children.Add(PresentationWindow.ActionButton("Überwachung stoppen", () =>
-        { scan.Stop(); inputDirectory = null; observed.Clear(); status.Text = "Ordnerüberwachung gestoppt."; }));
+        { scan.Stop(); observed.Clear(); status.Text = "Ordnerüberwachung pausiert."; }));
         panel.Children.Add(new TextBlock
         {
             Text = "Präsentationsfenster auf den zweiten Bildschirm ziehen; F11 für Vollbild.\n← / → blättern · Leertaste Diashow · Ende neuestes Bild · Esc Fenster",
@@ -55,8 +55,9 @@ public sealed class OperatorWindow : Window
         panel.Children.Add(PresentationWindow.ActionButton("Ausgewähltes Bild drucken / nachdrucken", QueueSelectedPhoto));
         panel.Children.Add(printStatus);
         panel.Children.Add(projectLabel); panel.Children.Add(status);
+        AddRemoteControls(panel);
         scan.Tick += async (_, _) => await ScanFolder();
-        Closed += (_, _) => { closing = true; scan.Stop(); presentation?.Close(); if (!busy) projectLock?.Dispose(); };
+        Closed += async (_, _) => { closing = true; scan.Stop(); presentation?.Close(); if (!busy) projectLock?.Dispose(); if (remoteServer is not null) await remoteServer.DisposeAsync(); };
     }
 
     private bool CanChangeProject()
@@ -119,6 +120,7 @@ public sealed class OperatorWindow : Window
         }
         scan.Stop(); inputDirectory = null; observed.Clear(); presentation?.Close(); presentation = null;
         projectDirectory = dir; grid = nextGrid; history = nextHistory;
+        remoteImages.Clear();
         savedPhotos.Clear(); savedPhotos.AddRange((saved?.Photos ?? []).Select(PrintRecovery.AfterRestart));
         printerName = saved?.PrinterName; printEnabled = false; lastPrintError = null; UpdatePrintStatus();
         SaveProject();
